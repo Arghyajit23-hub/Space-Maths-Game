@@ -1,0 +1,14 @@
+# Dependencies & logs
+node_modules/
+npm-debug.log*
+*.log
+
+# Runtime data — the live leaderboard must never be committed or overwritten by a deploy
+web/data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.env

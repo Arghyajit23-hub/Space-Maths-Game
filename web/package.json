@@ -1,0 +1,17 @@
+{
+  "name": "space-math",
+  "version": "2.0.0",
+  "description": "Space Math — a competitive space survival game where your mental maths decides how long you survive",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/challenges.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "Arghyajit Nayak",
+  "license": "MIT"
+}

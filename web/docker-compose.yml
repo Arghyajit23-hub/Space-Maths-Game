@@ -1,0 +1,14 @@
+services:
+  space-math:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - leaderboard:/app/data   # persists the leaderboard across restarts & redeploys
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+volumes:
+  leaderboard:
