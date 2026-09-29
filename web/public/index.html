@@ -4,15 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#02030d">
-  <meta name="description" content="Space Math — a fast, competitive space survival game where your mental maths decides how long you survive. Free to play in the browser.">
+  <meta name="description" content="Space Math — a competitive space survival game where your mental maths, memory and logic decide how far you get. Explore a galaxy, beat Dreadnoughts, take the Daily Galaxy.">
   <meta property="og:title" content="Space Math — Think fast. Survive longer.">
-  <meta property="og:description" content="Blast asteroids and alien motherships by solving calculations at speed. How far can you survive?">
+  <meta property="og:description" content="Blast asteroids, crack Splitters, remember Beacon codes and beat the Daily Galaxy. How far can your brain take you?">
   <meta property="og:type" content="website">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <title>Space Math — Think Fast. Survive Longer.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/hub.css">
 </head>
 <body>
 
@@ -20,7 +21,7 @@
   <div id="game">
     <canvas id="canvas"></canvas>
 
-    <!-- ── HUD ── -->
+    <!-- ══ IN-RUN HUD ══ -->
     <div id="hud" class="hidden">
       <div class="hud-left">
         <div class="hud-label">SCORE</div>
@@ -30,37 +31,32 @@
           <div class="mult-meter"><div id="hudMultFill"></div></div>
           <div id="hudStreak" class="streak">0</div>
         </div>
+        <div id="hudPerks" class="perk-chips"></div>
       </div>
-
       <div class="hud-center">
-        <div id="hudSector" class="sector-name">SECTOR 1 · ASTEROID BELT</div>
+        <div id="hudSector" class="sector-name">SECTOR 1</div>
         <div class="sector-bar"><div id="hudSectorFill"></div></div>
         <div id="hudSectorHint" class="sector-hint"></div>
       </div>
-
       <div class="hud-right">
         <div class="hull-row">
           <span class="hud-label">HULL</span>
           <div class="hull-bar"><div id="hudHullFill"></div></div>
           <span id="hudHull" class="hull-val">100</span>
         </div>
-        <div class="hud-meta">
-          <span id="hudTime">0:00</span>
-          <span id="hudPB"></span>
-        </div>
+        <div class="hud-meta"><span id="hudTime">0:00</span><span id="hudGhost" class="ghost"></span></div>
         <div id="hudRival" class="rival hidden"></div>
       </div>
     </div>
 
-    <!-- ── Targeting console ── -->
     <div id="console" class="hidden">
+      <div id="consoleLabel" class="c-label"></div>
       <div id="consolePrompt" class="c-prompt">—</div>
       <div class="c-eq">=</div>
       <div id="consoleInput" class="c-input"><span id="consoleValue"></span><span class="caret"></span></div>
       <div id="consoleNote" class="c-note">type to fire</div>
     </div>
 
-    <!-- ── Touch numpad ── -->
     <div id="numpad" class="hidden">
       <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
       <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
@@ -69,64 +65,32 @@
       <button data-k="enter" class="fire">FIRE</button>
     </div>
 
-    <!-- ── Banner ── -->
     <div id="banner" class="hidden"><div id="bannerTitle"></div><div id="bannerSub"></div></div>
+    <div id="tip" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
+
+    <!-- Perk draft -->
+    <section id="draftScreen" class="screen draft hidden">
+      <div class="kicker">SECTOR CLEARED · CHOOSE AN UPGRADE</div>
+      <div id="draftCards" class="draft-cards"></div>
+      <div class="keys">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or click</div>
+    </section>
 
     <button id="btnSound" class="icon-btn" title="Sound (M)">♫</button>
     <button id="btnPause" class="icon-btn hidden" title="Pause (Esc)">❚❚</button>
 
-    <!-- ── START ── -->
-    <section id="startScreen" class="screen">
-      <div class="start-grid">
-        <div class="start-main">
-          <div class="kicker">DEEP SPACE DEFENSE</div>
-          <h1>SPACE MATH</h1>
-          <div class="tagline">Think fast. Survive longer.</div>
-          <input id="nameInput" type="text" placeholder="PILOT CALLSIGN" maxlength="16" autocomplete="off" spellcheck="false">
-          <button id="btnStart" class="btn primary">LAUNCH <kbd>Enter</kbd></button>
-          <div id="pbLine" class="pb-line"></div>
-          <ul class="how">
-            <li><b>Type the answer</b> on any incoming threat — your laser fires instantly.</li>
-            <li><b>Chain hits</b> to raise your multiplier. Misses and impacts damage your hull.</li>
-            <li><b>Clear a sector</b> to face the Mothership, then warp deeper into space.</li>
-          </ul>
-          <div class="keys"><kbd>Space</kbd> clear · <kbd>Esc</kbd> pause · <kbd>M</kbd> sound</div>
-        </div>
-        <div class="start-board">
-          <h3>TOP PILOTS</h3>
-          <ol id="boardList" class="board"><li class="empty">Offline — scores saved on this device</li></ol>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── PAUSE ── -->
-    <section id="pauseScreen" class="screen hidden">
-      <h2>SYSTEMS PAUSED</h2>
-      <button id="btnResume" class="btn primary">RESUME <kbd>Esc</kbd></button>
-      <button id="btnAbort" class="btn ghost">ABANDON RUN</button>
-    </section>
-
-    <!-- ── DEBRIEF ── -->
-    <section id="overScreen" class="screen hidden">
-      <div class="kicker" id="overKicker">SHIP DESTROYED</div>
-      <div id="overRecord" class="record hidden">NEW PERSONAL BEST</div>
-      <div id="overScore" class="final-score">0</div>
-      <div id="overRank" class="rank-line"></div>
-      <div class="stat-grid">
-        <div><span id="stSector">1</span><label>SECTOR</label></div>
-        <div><span id="stTime">0:00</span><label>SURVIVED</label></div>
-        <div><span id="stAcc">0%</span><label>ACCURACY</label></div>
-        <div><span id="stAvg">–</span><label>AVG ANSWER</label></div>
-        <div><span id="stStreak">0</span><label>BEST STREAK</label></div>
-        <div><span id="stKills">0</span><label>THREATS DOWN</label></div>
-      </div>
-      <div id="insights" class="insights"></div>
-      <div id="nextGoal" class="next-goal"></div>
-      <div class="btn-row">
-        <button id="btnReplay" class="btn primary">RELAUNCH <kbd>Enter</kbd></button>
-        <button id="btnMenu" class="btn ghost">HANGAR</button>
-      </div>
-    </section>
+    <!-- ══ SCREENS (content rendered by js/ui/*) ══ -->
+    <section id="welcomeScreen" class="screen hidden"></section>
+    <section id="deckScreen" class="screen hub hidden"></section>
+    <section id="galaxyScreen" class="screen hub hidden"></section>
+    <section id="hangarScreen" class="screen hub hidden"></section>
+    <section id="brainScreen" class="screen hub hidden"></section>
+    <section id="codexScreen" class="screen hub hidden"></section>
+    <section id="recordsScreen" class="screen hub hidden"></section>
+    <section id="settingsScreen" class="screen hub hidden"></section>
+    <section id="parentScreen" class="screen hub hidden"></section>
+    <section id="pauseScreen" class="screen hidden"></section>
+    <section id="debriefScreen" class="screen hub hidden"></section>
   </div>
 </div>
 

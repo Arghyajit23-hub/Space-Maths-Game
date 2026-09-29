@@ -1,11 +1,21 @@
 # Space Math
 
-**Think fast. Survive longer.** This is a competitive space survival game for students. Asteroids and alien motherships dive at your ship, each carrying a calculation, and you survive by solving them at speed.
+**Think fast. Survive longer.** A competitive space survival game for students. Asteroids, Splitter crystals, Beacons and Dreadnoughts dive at your ship, and your mental maths, memory and logic are the only weapons. You explore a six-system galaxy, draft roguelite perks, beat your own Revenants, take on the Daily Galaxy, and climb the leaderboards with your class fleet.
 
-- **Play locally:** `npm start`, then open http://localhost:3000 (needs Node.js 18+, no install step)
+- **Play locally:** `npm start`, then open http://localhost:3000 (Node.js 18+, no install step)
 - **Test:** `npm test`
-- **Deploy:** see [web/README.md](web/README.md#deploying-online) for Docker and platform instructions
+- **Design:** [docs/FLOWMAP.md](docs/FLOWMAP.md) is the master flowmap with every system and number
+- **Run, deploy, extend:** [web/README.md](web/README.md)
 
-Everything lives in [`web/`](web): the game (`web/public`), the zero-dependency server with the leaderboard API (`web/server.js`), and the full design and architecture docs (`web/README.md`).
+---
 
-Author: Arghyajit Nayak · MIT License
+## License
+
+Space Math is dual-licensed:
+
+- **Free use** — AGPL-3.0 for personal use, classroom use, and open-source forks that publish their changes. See [LICENSE](LICENSE).
+- **Commercial use** — a separate paid license is required to embed Space Math in a product, charge for access, white-label it, or deploy it without releasing modifications. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md).
+
+**Contact for commercial licensing:** arghyajit.nayak@humaineeti.ai
+
+Author: Arghyajit Nayak · Copyright (C) 2026

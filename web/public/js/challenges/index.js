@@ -1,56 +1,42 @@
 // ════════════════════════════════════════════════════════════════
 //  CHALLENGE REGISTRY
 //
-//  The game engine never knows *what* kind of challenge it is running.
-//  It asks a challenge source for the next challenge, shows `prompt`,
-//  feeds the player's input to `check()`, and reports the outcome.
-//  New cognitive modes (memory, logic/pattern, reaction/attention) plug in
-//  by registering another source — no engine changes needed.
-//
-//  ChallengeSource {
-//    id:     'math' | 'memory' | 'logic' | 'reaction' | ...
-//    label:  human-readable name
-//    input:  'numeric'          (typed number — the only one the MVP UI renders)
-//            'choice' | 'sequence' | 'tap'   (future input panels)
-//    next(ctx) → Challenge
-//        ctx = { sector, heat, warmup, recentSkills: string[] }
-//  }
-//
-//  Challenge {
-//    mode:    source id
-//    skill:   stable skill id, e.g. 'mul_table' — used for stats & parent reports
-//    prompt:  string shown to the player, e.g. '17 × 8'
-//    answer:  canonical answer (shown on timeout — the hidden teaching moment)
-//    time:    base seconds allowed (before sector / adaptive scaling)
-//    value:   base points
-//    maxLen:  answer length in characters (drives auto-fire / auto-miss)
-//    check(input: string) → 'correct' | 'partial' | 'wrong'
-//        'partial' = a prefix of the answer (keep typing)
-//  }
+//  The engine never knows what a challenge *is*. The director asks this
+//  registry for a challenge for a skill id; the game shows `prompt`,
+//  feeds keystrokes to `check()`, and logs the result by `skill`.
+//  To add a new cognitive mode: write a source with `skills` and
+//  `generate(skillId, ctx)`, then add it to SOURCES below.
 // ════════════════════════════════════════════════════════════════
 
 import { MathChallenges, MATH_SKILLS } from './math.js';
+import { LogicChallenges, LOGIC_SKILLS } from './logic.js';
+import { MemoryChallenges, MEMORY_SKILLS } from './memory.js';
 
-const sources = new Map();
+export const SOURCES = [MathChallenges, LogicChallenges, MemoryChallenges];
 
-export function registerSource(source) { sources.set(source.id, source); }
-export function getSource(id) { return sources.get(id); }
-export function listSources() { return [...sources.values()]; }
+export const ALL_SKILLS = [...MATH_SKILLS, ...LOGIC_SKILLS, ...MEMORY_SKILLS];
+export const SKILL = Object.fromEntries(ALL_SKILLS.map(s => [s.id, s]));
+export const SKILL_LABELS = Object.fromEntries(ALL_SKILLS.map(s => [s.id, s.label]));
 
-// Human labels for every skill across modes (debrief / reports)
-export const SKILL_LABELS = {};
-export function registerSkills(skills) {
-  for (const s of skills) SKILL_LABELS[s.id] = s.label;
+const SOURCE_OF = {};
+for (const src of SOURCES) for (const s of src.skills) SOURCE_OF[s.id] = src;
+
+export const CHOICE_SKILLS = ALL_SKILLS.filter(s => s.choice).map(s => s.id);
+export const MEMORY_SKILL_IDS = MEMORY_SKILLS.map(s => s.id);
+
+/** Skill groups shown on the Brain Map */
+export const SYSTEM_GROUPS = [
+  { id: 'arith', name: 'Arithmetic', hue: 205 },
+  { id: 'fraction', name: 'Fractions & %', hue: 175 },
+  { id: 'power', name: 'Powers & Algebra', hue: 330 },
+  { id: 'memory', name: 'Memory', hue: 275 },
+  { id: 'logic', name: 'Logic & Estimation', hue: 45 },
+];
+
+export function generateSkill(skillId, ctx = {}) {
+  const src = SOURCE_OF[skillId];
+  if (!src) throw new Error(`Unknown skill ${skillId}`);
+  return src.generate(skillId, ctx);
 }
 
-registerSource(MathChallenges);
-registerSkills(MATH_SKILLS);
-
-// A "mix" decides which sources feed a run. MVP = pure math.
-// Later e.g. { math: 0.6, memory: 0.2, logic: 0.2 } for a mixed "Cognitive Gauntlet".
-export function pickSource(mix = { math: 1 }) {
-  const entries = Object.entries(mix).filter(([id]) => sources.has(id));
-  let r = Math.random() * entries.reduce((s, [, w]) => s + w, 0);
-  for (const [id, w] of entries) { if ((r -= w) <= 0) return sources.get(id); }
-  return sources.get(entries[0][0]);
-}
+export { MathChallenges, LogicChallenges, MemoryChallenges };

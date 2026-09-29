@@ -6,8 +6,8 @@
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let ctx = null, master = null, musicBus = null, musicOn = false, blipTimer = null;
 let enabled = true;
+let voice = true;
 let intensity = 0;           // 0..1 — drives soundtrack tempo
-try { enabled = localStorage.getItem('sm_sound') !== 'off'; } catch {}
 
 function ensure() {
   if (!AudioCtx) return false;
@@ -48,12 +48,8 @@ function noise(dur = 0.4, vol = 0.12, delay = 0, decay = 0.1) {
 export const Sound = {
   get enabled() { return enabled; },
   unlock() { ensure(); },
-  toggle() {
-    enabled = !enabled;
-    try { localStorage.setItem('sm_sound', enabled ? 'on' : 'off'); } catch {}
-    if (master) master.gain.value = enabled ? 1 : 0;
-    return enabled;
-  },
+  setEnabled(v) { enabled = !!v; if (master) master.gain.value = enabled ? 1 : 0; if (!enabled) this.stopMusic(); },
+  setVoice(v) { voice = !!v; },
   setIntensity(v) { intensity = Math.max(0, Math.min(1, v)); },
 
   key()      { tone(1400 + Math.random() * 200, 0.025, 'square', 0.012); },
@@ -114,7 +110,7 @@ export const Sound = {
 
 // ── Voice (Web Speech) — sparingly, only for big moments ──
 export function speak(text) {
-  if (!enabled || !('speechSynthesis' in window)) return;
+  if (!enabled || !voice || !('speechSynthesis' in window)) return;
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);

@@ -21,7 +21,8 @@ const DATA_DIR    = process.env.DATA_DIR || path.join(__dirname, 'data');
 const LB_FILE     = path.join(DATA_DIR, 'leaderboard.json');
 const MAX_ENTRIES = parseInt(process.env.MAX_ENTRIES, 10) || 100;
 const PUBLIC      = path.join(__dirname, 'public');
-const MODES       = new Set(['math', 'memory', 'logic', 'reaction', 'mixed']);
+// Boards: 'endless' (Deep Space, all-time) and 'daily' (per UTC day). v1 'math' entries load as 'endless'.
+const DAILY_KEEP_DAYS = 30;
 
 // ────────────────────────────────────────────
 //  Leaderboard persistence (atomic writes)
@@ -31,7 +32,9 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 function loadLeaderboard() {
   try {
     const data = JSON.parse(fs.readFileSync(LB_FILE, 'utf-8'));
-    return Array.isArray(data) ? data.filter(e => e && typeof e.score === 'number') : [];
+    return Array.isArray(data)
+      ? data.filter(e => e && typeof e.score === 'number').map(e => ({ ...e, mode: e.mode === 'daily' ? 'daily' : 'endless' }))
+      : [];
   } catch { return []; }
 }
 
@@ -79,36 +82,65 @@ function cleanName(raw) {
 // ────────────────────────────────────────────
 const clampInt = (v, min, max) => Math.min(max, Math.max(min, Math.floor(Number(v) || 0)));
 
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const today = (offset = 0) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+
+/** Fleet (class / school) code: 3–8 letters or digits, moderated. Empty = none. */
+function cleanFleet(raw) {
+  const f = String(raw ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  if (f.length < 3) return '';
+  const n = normalise(f);
+  if (BLOCK_ANYWHERE.some(w => n.includes(w)) || BLOCK_EXACT.includes(n)) return '';
+  return f;
+}
+
 function validate(p) {
   const score = clampInt(p.score, 0, 50_000_000);
   const survival = clampInt(p.survival, 0, 86_400);
   // Generous ceiling on points-per-second — blocks obviously forged submissions
-  if (score > 3000 + survival * 2500) return null;
-  return {
+  if (score > 5000 + survival * 8000) return null;
+  const mode = p.mode === 'daily' ? 'daily' : 'endless';
+  const entry = {
     name: cleanName(p.name),
-    score,
-    mode: MODES.has(p.mode) ? p.mode : 'math',
+    score, mode,
     sector: clampInt(p.sector, 1, 999),
     accuracy: clampInt(p.accuracy, 0, 100),
     bestStreak: clampInt(p.bestStreak, 0, 100_000),
     survival,
     date: new Date().toISOString(),
   };
+  const fleet = cleanFleet(p.fleet);
+  if (fleet) entry.fleet = fleet;
+  if (mode === 'daily') {
+    // Only today's (or yesterday's / tomorrow's, for time zones) Daily Galaxy is accepted
+    if (!DAY_RE.test(p.day) || ![today(-1), today(), today(1)].includes(p.day)) return null;
+    entry.day = p.day;
+  }
+  return entry;
 }
 
 function addScore(entry) {
   leaderboard.push(entry);
   leaderboard.sort((a, b) => b.score - a.score);
-  const perMode = {};
+  const counts = {};
+  const oldest = today(-DAILY_KEEP_DAYS);
   leaderboard = leaderboard.filter(e => {
-    const m = e.mode || 'math';
-    perMode[m] = (perMode[m] || 0) + 1;
-    return perMode[m] <= MAX_ENTRIES;
+    if (e.mode === 'daily' && e.day < oldest) return false;
+    const k = e.mode === 'daily' ? `daily:${e.day}` : 'endless';
+    counts[k] = (counts[k] || 0) + 1;
+    return counts[k] <= MAX_ENTRIES;
   });
   saveLeaderboard();
 }
 
-const forMode = mode => leaderboard.filter(e => (e.mode || 'math') === (MODES.has(mode) ? mode : 'math'));
+function board(q) {
+  const mode = q.get('mode') === 'daily' ? 'daily' : 'endless';
+  const fleet = cleanFleet(q.get('fleet'));
+  const day = DAY_RE.test(q.get('day') || '') ? q.get('day') : today();
+  return leaderboard
+    .filter(e => e.mode === mode && (mode !== 'daily' || e.day === day) && (!fleet || e.fleet === fleet))
+    .slice(0, MAX_ENTRIES);
+}
 
 // ────────────────────────────────────────────
 //  Rate limiting (per IP, in memory)
@@ -140,7 +172,7 @@ const SECURITY_HEADERS = {
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' https://fonts.googleapis.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",   // inline style attributes only; scripts stay strict
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
     "connect-src 'self'",
@@ -192,7 +224,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/health') return json(res, 200, { status: 'ok', entries: leaderboard.length });
 
   if (pathname === '/api/leaderboard') {
-    if (req.method === 'GET') return json(res, 200, forMode(query.get('mode')).slice(0, MAX_ENTRIES));
+    if (req.method === 'GET') return json(res, 200, board(query));
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
     if (rateLimited(clientIp(req))) return json(res, 429, { error: 'Too many submissions — try again later' });
 
@@ -207,7 +239,7 @@ const server = http.createServer((req, res) => {
       const entry = validate(payload);
       if (!entry) return json(res, 422, { error: 'Score rejected' });
       addScore(entry);
-      json(res, 200, forMode(entry.mode).slice(0, MAX_ENTRIES));
+      json(res, 200, board(new URLSearchParams({ mode: entry.mode, ...(entry.day ? { day: entry.day } : {}) })));
     });
     return;
   }
