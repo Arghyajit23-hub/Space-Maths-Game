@@ -3,7 +3,7 @@
 //  keyboard/touch input and the render loop. (FLOWMAP §1)
 // ════════════════════════════════════════════════════════════════
 
-import { CONFIG, multiplierProgress } from './config.js';
+import { CONFIG, VIEW, computeView, multiplierProgress } from './config.js';
 import { fmt, clock, esc } from './core/util.js';
 import { dayKey } from './core/rng.js';
 import { Game } from './game/game.js';
@@ -23,21 +23,61 @@ import { renderDebrief, setDebriefRank } from './ui/debrief.js';
 const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 if (isTouch) document.body.classList.add('touch');
 
-// ── Canvas: the 1300×700 #game box is scaled to fit the window ──
+// ── Canvas: the play-field (#game) always fills the window ──
+// VIEW (config.js) turns the window into a logical W×H field that matches the
+// screen's aspect ratio; #game is sized to that and scaled by VIEW.k, so there
+// are no letterbox bars and nothing is cropped, from phones to ultrawides.
 const canvas = $('canvas'), ctx = canvas.getContext('2d');
-function fit() {
-  const scale = Math.min(innerWidth / CONFIG.WIDTH, innerHeight / CONFIG.HEIGHT) * 0.985;
-  $('game').style.transform = `scale(${scale})`;
-  const dpr = Math.min(devicePixelRatio || 1, CONFIG.MAX_DPR);
-  canvas.width = Math.round(CONFIG.WIDTH * scale * dpr);
-  canvas.height = Math.round(CONFIG.HEIGHT * scale * dpr);
-  ctx.setTransform(canvas.width / CONFIG.WIDTH, 0, 0, canvas.height / CONFIG.HEIGHT, 0, 0);
+const gameEl = $('game'), safeProbe = document.createElement('div');
+safeProbe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+document.body.appendChild(safeProbe);
+function readSafe() {
+  const cs = getComputedStyle(safeProbe);
+  return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
 }
-addEventListener('resize', fit);
+function viewportSize() {
+  const vv = window.visualViewport;
+  // visualViewport excludes on-screen keyboards / browser chrome on mobile; ignore pinch-zoom
+  if (vv && vv.scale === 1) return [vv.width, vv.height];
+  return [document.documentElement.clientWidth || innerWidth, document.documentElement.clientHeight || innerHeight];
+}
+let onRelayout = () => {};
+function fit() {
+  const [vw, vh] = viewportSize();
+  const old = { ...VIEW };
+  const changed = computeView(vw, vh, isTouch, readSafe());
+  gameEl.style.width = `${VIEW.W}px`; gameEl.style.height = `${VIEW.H}px`;
+  gameEl.style.transform = `scale(${VIEW.k})`;
+  const cls = gameEl.classList;
+  cls.toggle('v-narrow', VIEW.narrow); cls.toggle('v-tall', VIEW.tall); cls.toggle('v-wide', !VIEW.narrow);
+  cls.toggle('v-compact', VIEW.tall || VIEW.W < 820);
+  const st = gameEl.style, sf = VIEW.safe;
+  st.setProperty('--safe-t', `${sf.t}px`); st.setProperty('--safe-r', `${sf.r}px`);
+  st.setProperty('--safe-b', `${sf.b}px`); st.setProperty('--safe-l', `${sf.l}px`);
+  st.setProperty('--vw', `${VIEW.W}px`); st.setProperty('--vh', `${VIEW.H}px`);
+  // Backing store: device pixels, capped so 4K/5K screens don't allocate giant canvases
+  let px = Math.min(devicePixelRatio || 1, CONFIG.MAX_DPR) * VIEW.k;
+  const MAX_PIXELS = 3840 * 2400;
+  if (VIEW.W * VIEW.H * px * px > MAX_PIXELS) px = Math.sqrt(MAX_PIXELS / (VIEW.W * VIEW.H));
+  canvas.style.width = `${VIEW.W}px`; canvas.style.height = `${VIEW.H}px`;
+  canvas.width = Math.round(VIEW.W * px);
+  canvas.height = Math.round(VIEW.H * px);
+  ctx.setTransform(canvas.width / VIEW.W, 0, 0, canvas.height / VIEW.H, 0, 0);
+  if (changed) onRelayout(old);
+}
+let fitQueued = false;
+function queueFit() { if (fitQueued) return; fitQueued = true; requestAnimationFrame(() => { fitQueued = false; fit(); }); }
+addEventListener('resize', queueFit);
+addEventListener('orientationchange', () => setTimeout(fit, 120));
+window.visualViewport?.addEventListener('resize', queueFit);
 fit();
 
 const game = new Game();
-if (isTouch) game.fieldMaxX = CONFIG.WIDTH - 420;
+onRelayout = old => {
+  game.relayout(old);
+  // Canvas-based menu screens measure their box when drawn, so redraw them at the new size
+  if (ui === 'menu' && (screen === 'brain' || screen === 'hangar')) app.go(screen);
+};
 if (new URLSearchParams(location.search).has('debug')) window.__game = game; // debug & automated play tests only
 
 // ════════════════════════════════════════════
@@ -332,13 +372,14 @@ document.addEventListener('keydown', e => {
     else if (k === 'Escape') app.go('deck');
     return;
   }
+  // Escape always leaves a hub screen, even while a text box (parent gate, callsign, fleet code) has focus
+  if (k === 'Escape' && screen && screen !== 'welcome' && screen !== 'deck') { e.preventDefault(); e.target.blur?.(); app.go('deck'); return; }
   if (typing) return;
   if (screen === 'deck') {
     if (k === 'Enter') { e.preventDefault(); app.action('continue'); return; }
     const f = DECK_KEYS[k.toLowerCase()]; if (f) f();
     return;
   }
-  if (k === 'Escape' && screen && screen !== 'welcome') app.go('deck');
 });
 
 $('numpad').addEventListener('pointerdown', e => {

@@ -4,8 +4,12 @@
 // ════════════════════════════════════════════════════════════════
 
 export const CONFIG = {
+  // Design reference size. The live play-field size is VIEW.W × VIEW.H (below),
+  // which follows the screen's aspect ratio instead of letterboxing.
   WIDTH: 1300,
   HEIGHT: 700,
+  MIN_VIEW_W: 620,   // the play-field is never narrower than this (logical px)
+  MIN_VIEW_H: 700,   // …nor shorter than this
 
   // ── Ship & damage (FLOWMAP §2) ──
   HULL_MAX: 100,
@@ -84,4 +88,53 @@ export function multiplierProgress(streak) {
   const t = CONFIG.MULTIPLIER_TIERS;
   for (let i = 0; i < t.length - 1; i++) if (streak < t[i + 1][0]) return (streak - t[i][0]) / (t[i + 1][0] - t[i][0]);
   return 1;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  VIEW — the live, screen-adaptive play-field (logical px).
+//  One logical px = VIEW.k screen px. The field keeps at least
+//  MIN_VIEW_W × MIN_VIEW_H logical px and grows along whichever axis
+//  the screen has spare, so it always fills the window edge-to-edge.
+// ════════════════════════════════════════════════════════════════
+export const VIEW = {
+  W: CONFIG.WIDTH, H: CONFIG.HEIGHT, k: 1, ts: 1,
+  touch: false,
+  tall: false,        // portrait: numpad docks at the bottom
+  narrow: false,      // compact width: HUD/menus reflow
+  safe: { t: 0, r: 0, b: 0, l: 0 },
+  // Play-field geometry (derived in computeView)
+  shipY: CONFIG.HEIGHT - 140,
+  impactY: CONFIG.HEIGHT - 198,
+  fieldMinX: 150,
+  fieldMaxX: CONFIG.WIDTH - 150,
+  top: 110,           // below the HUD: where allies fly and the boss parks
+  numpad: { w: 0, h: 0 },
+};
+
+/** Recompute VIEW for a screen of vw × vh CSS px. Returns true if the logical size changed. */
+export function computeView(vw, vh, touch = VIEW.touch, safe = VIEW.safe) {
+  const k = Math.min(vw / CONFIG.MIN_VIEW_W, vh / CONFIG.MIN_VIEW_H);
+  const W = Math.round(vw / k), H = Math.round(vh / k);
+  const changed = W !== VIEW.W || H !== VIEW.H;
+  Object.assign(VIEW, { W, H, k, touch });
+  VIEW.safe = { t: safe.t / k, r: safe.r / k, b: safe.b / k, l: safe.l / k };
+  VIEW.narrow = W < 1000;
+  // On small physical screens, canvas text (threat plates, popups) is boosted so it stays readable
+  VIEW.ts = Math.min(1.35, Math.max(1, 0.8 / k));
+  VIEW.tall = H > W * 1.05;
+  VIEW.top = (VIEW.narrow ? 150 : 110) + VIEW.safe.t;
+
+  // Touch numpad: bottom dock on tall screens, right-hand column otherwise
+  const s = VIEW.safe;
+  if (!touch) VIEW.numpad = { w: 0, h: 0, dock: 'none' };
+  else if (VIEW.tall) VIEW.numpad = { w: W, h: 4 * 74 + 3 * 8 + 16, dock: 'bottom' };
+  else VIEW.numpad = { w: (VIEW.narrow ? 3 * 70 + 16 : 3 * 86 + 16) + 18 + s.r, h: 0, dock: 'side' };
+
+  const bottomReserve = VIEW.numpad.h + (VIEW.numpad.dock === 'bottom' ? 86 : 0) + s.b;
+  VIEW.shipY = H - bottomReserve - (VIEW.numpad.dock === 'bottom' ? 70 : 140);
+  VIEW.impactY = VIEW.shipY - 58;
+  const margin = VIEW.narrow ? 90 : 150;
+  VIEW.fieldMinX = margin + s.l;
+  VIEW.fieldMaxX = Math.max(VIEW.fieldMinX + 200, W - (VIEW.numpad.dock === 'side' ? VIEW.numpad.w + 80 : margin) - s.r);
+  return changed;
 }

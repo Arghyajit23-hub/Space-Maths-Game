@@ -407,7 +407,7 @@ export function renderParent(app) {
       else { toast('That is not quite right.'); renderParent(app); }
     };
     $('btnGate').onclick = tryOpen;
-    $('gateInput').onkeydown = e => { if (e.key === 'Enter') tryOpen(); e.stopPropagation(); };
+    $('gateInput').onkeydown = e => { if (e.key === 'Enter') tryOpen(); if (e.key !== 'Escape') e.stopPropagation(); };
     wire(root, app);
     setTimeout(() => $('gateInput')?.focus(), 50);
     return;

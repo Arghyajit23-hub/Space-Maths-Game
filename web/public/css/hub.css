@@ -1,10 +1,12 @@
 /* ════════════════════════════════════════════════════════════
    COMMAND DECK & MENUS — galaxy map, hangar, brain map, codex,
    records, settings, parent zone, debrief, perk draft.
-   All sizes are in the fixed 1300×700 logical box.
+   Sizes are logical px inside the adaptive #game box (see style.css);
+   .v-compact rules at the bottom reflow everything for compact/portrait screens.
    ════════════════════════════════════════════════════════════ */
 
-.screen.hub { justify-content: flex-start; align-items: stretch; text-align: left; padding: 22px 34px 20px;
+.screen.hub { justify-content: flex-start; align-items: stretch; text-align: left;
+  padding: calc(22px + var(--safe-t)) calc(34px + var(--safe-r)) calc(20px + var(--safe-b)) calc(34px + var(--safe-l));
   background: radial-gradient(ellipse at 50% 40%, rgba(6,10,34,.55), rgba(0,0,8,.9)); }
 .hub-head { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; min-height: 44px; padding-right: 48px; }
 .hub-head h2 { font-size: 26px; letter-spacing: 6px; margin: 0; }
@@ -206,10 +208,10 @@ table.skills td { padding: 6px; border-bottom: 1px solid rgba(255,255,255,.05); 
 .perk-chips span { font-size: 12px; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); }
 
 /* ── Tip + toast + ghost ── */
-#tip { position: absolute; left: 22px; bottom: 22px; z-index: 9; max-width: 380px; text-align: left;
+#tip { position: absolute; left: calc(22px + var(--safe-l)); bottom: calc(22px + var(--safe-b)); z-index: 9; max-width: 380px; text-align: left;
   font-size: 16px; padding: 10px 18px; border-radius: 12px; background: rgba(0,20,40,.88); border: 1px solid var(--cyan); color: #e0f7fa;
   animation: tipIn .3s ease; pointer-events: none; }
-#toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20; font-size: 14px; padding: 10px 18px;
+#toast { position: absolute; left: 50%; bottom: calc(24px + var(--safe-b)); max-width: calc(100% - 32px); text-align: center; transform: translateX(-50%); z-index: 20; font-size: 14px; padding: 10px 18px;
   border-radius: 10px; background: rgba(0,0,0,.85); border: 1px solid rgba(255,255,255,.2); }
 .ghost { font-weight: 700; }
 .ghost.ahead { color: var(--green); }
@@ -218,14 +220,75 @@ table.skills td { padding: 6px; border-bottom: 1px solid rgba(255,255,255,.05); 
   font: 700 11px var(--orb); letter-spacing: 3px; color: var(--gold); background: #030817; border-radius: 4px; }
 .c-label:empty { display: none; }
 
+/* ════════════════════════════════════════════════════════════
+   COMPACT MENUS (phones, portrait, W < 820) — screens become a single scrolling column
+   ════════════════════════════════════════════════════════════ */
+.v-compact .screen.hub { overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(24px + var(--safe-b)) calc(16px + var(--safe-l)); }
+.v-compact .screen.hub > * { flex-shrink: 0; }
+.v-compact .hub-head { flex-wrap: wrap; gap: 10px 14px; padding-right: 44px; }
+.v-compact .hub-head h2 { font-size: 22px; letter-spacing: 4px; }
+.v-compact .hub-head .spacer { display: none; }
+.v-compact .pilot-bar { flex-wrap: wrap; gap: 10px; }
+.v-compact .rank { min-width: 180px; }
+.v-compact .field[style] { min-width: 0 !important; width: 100%; }
+
+/* Command deck: 2 columns, auto-height rows */
+.v-compact .deck-grid { flex: none; grid-template-columns: 1fr 1fr; grid-template-rows: none; grid-auto-rows: minmax(150px, auto); }
+.v-compact .tile.hero { grid-column: 1 / -1; grid-row: auto; }
+.v-compact .tile.hero .m-name { font-size: 26px; }
+
+/* Galaxy: map on top, mission panel below */
+.v-compact .galaxy-wrap { flex: none; grid-template-columns: 1fr; }
+.v-compact .galaxy-map { height: 420px; }
+.v-compact .sys-orb { width: 58px; height: 58px; }
+.v-compact .sys-name { font-size: 10px; letter-spacing: 1px; }
+.v-compact .mission-list.scroll { overflow: visible; }
+
+/* Hangar / codex / records / brain */
+.v-compact .card-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.v-compact .item { min-height: 230px; }
+.v-compact .codex-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); overflow: visible; }
+.v-compact .brain-wrap { flex: none; grid-template-columns: 1fr; }
+.v-compact .brain-canvas { height: 440px; }
+.v-compact .rec-wrap { flex: none; grid-template-columns: 1fr; }
+.v-compact .rec-col { max-height: 520px; }
+.v-compact .report { grid-template-columns: 1fr 1fr; }
+.v-compact .report .kpi b { font-size: 22px; }
+.v-compact table.skills { font-size: 12px; }
+.v-compact table.skills th, .v-compact table.skills td { padding: 5px 4px; }
+.v-compact .meter { width: 64px; }
+.v-compact .setting { flex-wrap: wrap; }
+.v-compact .gate { margin: 30px auto; max-width: 100%; }
+
+/* Debrief: stacked columns */
+.v-compact #debriefScreen { align-items: stretch; }
+.v-compact .db-title { font-size: 26px; letter-spacing: 4px; }
+.v-compact .db-score { font-size: 50px; }
+.v-compact .db-grid { flex: none; grid-template-columns: 1fr; }
+.v-compact .db-actions { flex-wrap: wrap; }
+
+/* Perk draft: cards shrink to fit three across, or stack on portrait */
+.v-narrow .draft-cards { gap: 10px; padding: 0 12px; }
+.v-narrow .perk { width: 186px; min-height: 230px; padding: 14px 12px; }
+.v-narrow .perk .p-icon { font-size: 44px; margin: 10px 0 4px; }
+.v-narrow .perk h4 { font-size: 15px; }
+.v-narrow .perk p { font-size: 13px; }
+.v-tall .draft-cards { flex-direction: column; width: 100%; max-width: 520px; }
+.v-tall .perk { width: auto; min-height: 0; display: grid; grid-template-columns: 70px 1fr; grid-template-rows: auto auto auto; text-align: left; column-gap: 12px; align-items: center; }
+.v-tall .perk .p-key { grid-column: 1 / -1; }
+.v-tall .perk .p-icon { grid-row: span 2; margin: 0; text-align: center; }
+.v-tall .perk h4 { margin: 0; }
+.v-tall .perk .p-stack { grid-column: 2; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes perkIn { from { opacity: 0; transform: translateY(30px) scale(.9); } }
 @keyframes tipIn { from { opacity: 0; transform: translateY(8px); } }
 
 @media print {
   body { background: #fff; color: #000; overflow: visible; }
-  #stage { position: static; display: block; }
-  #game { transform: none !important; width: auto; height: auto; box-shadow: none; overflow: visible; }
+  #stage { position: static; display: block; overflow: visible; }
+  #game { position: static; transform: none !important; width: auto !important; height: auto !important; box-shadow: none; overflow: visible; }
   #game > *:not(#parentScreen) { display: none !important; }
   #parentScreen { position: static; display: block !important; background: #fff; color: #000; padding: 0; }
   #parentScreen .glass { background: #fff; border-color: #ccc; }

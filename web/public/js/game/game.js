@@ -8,7 +8,7 @@
 //  `type() / backspace() / submit() / choosePerk()`.
 // ════════════════════════════════════════════════════════════════
 
-import { CONFIG, THREAT_INFO } from '../config.js';
+import { CONFIG, THREAT_INFO, VIEW } from '../config.js';
 import { RNG } from '../core/rng.js';
 import { isPrime, lerp } from '../core/util.js';
 import { Director } from './director.js';
@@ -18,9 +18,6 @@ import { SHIP, CREW_BY_ID } from '../data/ships.js';
 import { Sound, speak } from '../services/audio.js';
 import { explain } from '../challenges/common.js';
 
-const W = CONFIG.WIDTH, H = CONFIG.HEIGHT;
-const SHIP_Y = H - 140;
-const IMPACT_Y = SHIP_Y - 58;
 const rand = (a, b) => a + Math.random() * (b - a);
 const noop = () => {};
 let nextId = 1;
@@ -35,8 +32,7 @@ export class Game {
   constructor() {
     this.on = { hud: noop, target: noop, input: noop, feedback: noop, banner: noop, over: noop, record: noop, draft: noop, tip: noop };
     this.state = 'idle';
-    this.fieldMaxX = W - 150;
-    this.stars = Array.from({ length: 220 }, () => ({ x: Math.random() * W, y: Math.random() * H, z: Math.random() * 2.6 + 0.4, tw: Math.random() * 6.28 }));
+    this.stars = Array.from({ length: 260 }, () => ({ x: Math.random() * VIEW.W, y: Math.random() * VIEW.H, z: Math.random() * 2.6 + 0.4, tw: Math.random() * 6.28 }));
     this.reset({ run: { id: 'idle', kind: 'idle', level: 1, sectors: 1, enemies: () => ({ rock: 1 }), sectorKills: () => 1, bossHp: () => 1 } });
     this.state = 'idle';
   }
@@ -62,7 +58,7 @@ export class Game {
     if (this.mods.phantom) this._applyPerk(RNG.pick(PERKS).id, true);
     this.hull = this.mods.hullMax;
     this.threats = []; this.particles = []; this.lasers = []; this.popups = []; this.rings = [];
-    this.ship = { x: W / 2, y: H + 80, aim: -Math.PI / 2, hit: 0, recoil: 0 };
+    this.ship = { x: VIEW.W / 2, y: VIEW.H + 80, aim: -Math.PI / 2, hit: 0, recoil: 0 };
     this.target = null;
     this.input = '';
     this.deferT = 0;
@@ -93,6 +89,28 @@ export class Game {
     this.droneReady = this.mods.carrier;
     this.sectorHullStart = this.hull;
     this.sectorDamaged = false;
+  }
+
+  get fieldMinX() { return VIEW.fieldMinX; }
+  get fieldMaxX() { return VIEW.fieldMaxX; }
+
+  /** The screen changed size: remap everything on the field into the new play-field. `old` is the previous VIEW snapshot. */
+  relayout(old) {
+    const sx = VIEW.W / old.W, sy = VIEW.H / old.H;
+    const mapX = x => VIEW.fieldMinX + ((x - old.fieldMinX) / Math.max(1, old.fieldMaxX - old.fieldMinX)) * (VIEW.fieldMaxX - VIEW.fieldMinX);
+    for (const s of this.stars) { s.x = Math.random() * VIEW.W; s.y = Math.random() * VIEW.H; }
+    for (const th of this.threats) {
+      if (th.ally) { th.laneY += VIEW.top - old.top; continue; }
+      if (th.kind === 'boss') continue;
+      const end = mapX(th.x0 + th.drift);
+      th.x0 = mapX(th.x0);
+      th.drift = end - th.x0;
+      th.x = th.x0 + th.drift * th.progress;
+    }
+    for (const p of [...this.particles, ...this.popups, ...this.rings]) { p.x *= sx; p.y *= sy; }
+    this.lasers.length = 0;
+    this.ship.x = VIEW.W / 2;
+    this.ship.y = this.state === 'play' ? VIEW.shipY : VIEW.H + 80;
   }
 
   get sector() { return this.session.sector; }
@@ -269,7 +287,7 @@ export class Game {
     if (res.multUp) {
       Sound.multUp(res.mult);
       this.on.feedback('mult', { mult: res.mult });
-      this.popups.push({ x: W / 2, y: H / 2 - 40, text: `×${res.mult} MULTIPLIER`, life: 1.6, color: '#00e5ff', size: 40, big: true });
+      this.popups.push({ x: VIEW.W / 2, y: VIEW.H / 2 - 40, text: `×${res.mult} MULTIPLIER`, life: 1.6, color: '#00e5ff', size: 40, big: true });
     }
     const st = this.session.streak;
     if (st > 0 && Math.floor(st / this.mods.repairEvery) > Math.floor((st - 1 - this.mods.overclock) / this.mods.repairEvery) && this.hull < this.mods.hullMax) {
@@ -278,7 +296,7 @@ export class Game {
     if (!this.recordAnnounced && this.personalBest > 0 && this.session.score > this.personalBest) {
       this.recordAnnounced = true;
       Sound.record(); this.on.record();
-      this.popups.push({ x: W / 2, y: H / 2 + 10, text: 'NEW PERSONAL BEST!', life: 2, color: '#ffd740', size: 34, big: true });
+      this.popups.push({ x: VIEW.W / 2, y: VIEW.H / 2 + 10, text: 'NEW PERSONAL BEST!', life: 2, color: '#ffd740', size: 34, big: true });
     }
     if (this.run.kind === 'tutorial' && this.session.kills === 1) this._tip('Great shot! Chain correct answers to build your ×multiplier.', 'kill1');
 
@@ -395,7 +413,7 @@ export class Game {
     const bonus = CONFIG.SECTOR_CLEAR_BONUS * this.level;
     this.session.addBonus(bonus * this.mods.pointsMult);
     if (!this.sectorDamaged) this.session.flawlessSectors++;
-    this.popups.push({ x: W / 2, y: H / 2 - 60, text: `${th.name.toUpperCase()} DESTROYED`, sub: `SECTOR BONUS +${Math.round(bonus * this.mods.pointsMult)}`, life: 2.4, color: '#ffd740', size: 32, big: true });
+    this.popups.push({ x: VIEW.W / 2, y: VIEW.H / 2 - 60, text: `${th.name.toUpperCase()} DESTROYED`, sub: `SECTOR BONUS +${Math.round(bonus * this.mods.pointsMult)}`, life: 2.4, color: '#ffd740', size: 32, big: true });
     this.phase = 'bossDown'; this.phaseT = 0;
   }
 
@@ -433,8 +451,9 @@ export class Game {
 
   _lane() {
     let x, tries = 0;
-    do { x = RNG.float(150, this.fieldMaxX); tries++; }
-    while (tries < 14 && this.threats.some(t => !t.dying && !t.ally && Math.abs(t.x - x) < 190 && t.progress < 0.45));
+    const gap = Math.min(190, (this.fieldMaxX - this.fieldMinX) / 3);
+    do { x = RNG.float(this.fieldMinX, this.fieldMaxX); tries++; }
+    while (tries < 14 && this.threats.some(t => !t.dying && !t.ally && Math.abs(t.x - x) < gap && t.progress < 0.45));
     return x;
   }
 
@@ -455,7 +474,7 @@ export class Game {
     if (kind === 'mirror') th.hue = 200;
     if (kind === 'beacon') th.hue = 275;
     if (kind === 'cloaked') th.hue = 250;
-    th.drift = Math.min(this.fieldMaxX, lerp(x, W / 2, RNG.float(0.15, 0.4))) - x;
+    th.drift = Math.min(this.fieldMaxX, lerp(x, VIEW.W / 2, RNG.float(0.15, 0.4))) - x;
     return th;
   }
 
@@ -474,7 +493,7 @@ export class Game {
     const kind = this.director.nextKind(lvl);
     if (kind === 'swarm') {
       const cs = this.director.swarm(lvl).map(c => this.director.issue(c));
-      const x = Math.min(this.fieldMaxX - 60, Math.max(210, this._lane()));
+      const x = Math.min(this.fieldMaxX - 60, Math.max(this.fieldMinX + 60, this._lane()));
       const group = nextId++;
       const offs = [[-70, 0], [70, 0], [0, -55]];
       cs.forEach((c, i) => {
@@ -489,7 +508,7 @@ export class Game {
     } else if (kind === 'ally') {
       const c = this.director.challengeFor('ally', lvl);
       const fromLeft = RNG.chance(0.5);
-      const th = this._makeThreat('ally', c, fromLeft ? -60 : W + 60, { ally: true, hue: 130, dir: fromLeft ? 1 : -1, laneY: RNG.float(110, 230) });
+      const th = this._makeThreat('ally', c, fromLeft ? -60 : VIEW.W + 60, { ally: true, hue: 130, dir: fromLeft ? 1 : -1, laneY: VIEW.top + RNG.float(0, 120) });
       th.allowed = CONFIG.ALLY_TIME; th.rate = 1 / CONFIG.ALLY_TIME;
       this.threats.push(th);
       this._tip(THREAT_INFO.ally.tip, 'ally');
@@ -531,7 +550,7 @@ export class Game {
     const name = this.director.bossName(lvl);
     this.session.bossName = name;
     const th = {
-      id: nextId++, kind: 'boss', name, challenge: c, x0: W / 2, x: W / 2, y: -140, drift: 0,
+      id: nextId++, kind: 'boss', name, challenge: c, x0: VIEW.W / 2, x: VIEW.W / 2, y: -140, drift: 0,
       progress: 0, qElapsed: 0, ready: true, hp, maxHp: hp, allowed: this.director.timeFor(c, lvl, 'boss'),
       travel: Math.max(hp * 7 * CONFIG.levelTimeFactor(lvl) * this.mods.timeMult, 16), size: 120, hue: this.theme.hue2,
       rot: 0, spin: 0, wob: 0, dying: false, dieT: 0, hitFlash: 0, revealLeft: this.director.revealFor(c),
@@ -555,7 +574,7 @@ export class Game {
     this.t += dt; this.phaseT += dt;
     const s = this.ship;
 
-    s.y = lerp(s.y, (this.phase === 'dying' ? s.y : SHIP_Y) + Math.sin(this.t * 2) * 3, Math.min(1, dt * 4));
+    s.y = lerp(s.y, (this.phase === 'dying' ? s.y : VIEW.shipY) + Math.sin(this.t * 2) * 3, Math.min(1, dt * 4));
     s.hit = Math.max(0, s.hit - dt * 2.5);
     s.recoil = Math.max(0, s.recoil - dt * 6);
     if (this.target) s.aim = lerp(s.aim, Math.atan2(this.target.y - s.y, this.target.x - s.x), Math.min(1, dt * 8));
@@ -662,19 +681,19 @@ export class Game {
         th.progress += dt / th.travel;
         th.enter = Math.min(1, (th.enter || 0) + dt * 0.8);
         const ease = 1 - Math.pow(1 - th.enter, 3);
-        th.x = W / 2 + Math.sin(th.wob * 0.35) * 160;
-        th.y = lerp(-140, lerp(170, IMPACT_Y - 80, th.progress), ease);
+        th.x = VIEW.W / 2 + Math.sin(th.wob * 0.35) * Math.min(160, VIEW.W / 2 - 170);
+        th.y = lerp(-140, lerp(VIEW.top + 60, VIEW.impactY - 80, th.progress), ease);
         if (th.progress >= 1) this._impact(th);
       } else if (th.ally) {
         th.progress += dt * th.rate;
-        th.x = th.dir > 0 ? lerp(-60, W + 60, th.progress) : lerp(W + 60, -60, th.progress);
+        th.x = th.dir > 0 ? lerp(-60, VIEW.W + 60, th.progress) : lerp(VIEW.W + 60, -60, th.progress);
         th.y = th.laneY + Math.sin(th.wob) * 8;
         if (th.progress >= 1) this.threats.splice(i, 1);
       } else {
         th.progress += dt * th.rate;
         const p = th.progress;
         th.x = th.x0 + th.drift * p + (th.kind === 'saucer' || th.kind === 'revenant' ? Math.sin(th.wob) * 14 : 0);
-        th.y = lerp(-50, IMPACT_Y, p) + (th.yOff || 0) * (1 - p);
+        th.y = lerp(-50, VIEW.impactY, p) + (th.yOff || 0) * (1 - p);
         if (th.kind === 'splitter' && p >= CONFIG.SPLIT_AT && th.challenge.parts) { this._crack(th); continue; }
         if (th === this.target && p > 0.75 && !th.warned) { th.warned = true; Sound.alarm(); }
         if (p >= 1) { this._impact(th); if (this.phase === 'dying') break; }
@@ -730,4 +749,4 @@ export class Game {
   }
 }
 
-export const LAYOUT = { SHIP_Y, IMPACT_Y };
+export const LAYOUT = { get SHIP_Y() { return VIEW.shipY; }, get IMPACT_Y() { return VIEW.impactY; } };

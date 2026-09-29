@@ -1,13 +1,12 @@
 // ════════════════════════════════════════════════════════════════
-//  RENDERER — draws a Game onto a 2D canvas in logical 1300×700 units.
+//  RENDERER — draws a Game onto a 2D canvas in logical VIEW.W×VIEW.H units.
 //  Nebula backgrounds are pre-rendered per theme; particles use additive
 //  blending instead of shadowBlur for speed.
 // ════════════════════════════════════════════════════════════════
 
-import { CONFIG } from '../config.js';
+import { CONFIG, VIEW } from '../config.js';
 import { LAYOUT } from './game.js';
 
-const W = CONFIG.WIDTH, H = CONFIG.HEIGHT;
 const FONT = "'Orbitron', 'Segoe UI Symbol', 'Segoe UI', sans-serif";
 export const MULT_COLORS = ['#00e5ff', '#00e5ff', '#69f0ae', '#ffd740', '#ff6e40', '#e040fb'];
 
@@ -16,18 +15,18 @@ export function setReducedMotion(v) { reducedMotion = v; }
 
 const bgCache = new Map();
 function nebula(hue, hue2) {
-  const key = `${hue}-${hue2}`;
+  const key = `${hue}-${hue2}-${VIEW.W}x${VIEW.H}`;
   if (bgCache.has(key)) return bgCache.get(key);
-  const c = document.createElement('canvas'); c.width = W; c.height = H * 2;
+  const c = document.createElement('canvas'); c.width = VIEW.W; c.height = VIEW.H * 2;
   const g = c.getContext('2d');
   const base = g.createLinearGradient(0, 0, 0, c.height);
   base.addColorStop(0, `hsl(${hue}, 60%, 4%)`); base.addColorStop(0.5, `hsl(${hue2}, 50%, 3%)`); base.addColorStop(1, `hsl(${hue}, 60%, 4%)`);
-  g.fillStyle = base; g.fillRect(0, 0, W, c.height);
+  g.fillStyle = base; g.fillRect(0, 0, VIEW.W, c.height);
   const blobs = [[0.25, 0.2, 420, hue], [0.75, 0.45, 380, hue2], [0.4, 0.75, 460, hue], [0.8, 0.95, 340, hue2], [0.2, 1.3, 400, hue2], [0.7, 1.6, 420, hue], [0.25, 1.95, 360, hue]];
   for (const [x, y, r, h] of blobs) {
-    const gr = g.createRadialGradient(x * W, y * H, 0, x * W, y * H, r);
+    const gr = g.createRadialGradient(x * VIEW.W, y * VIEW.H, 0, x * VIEW.W, y * VIEW.H, r);
     gr.addColorStop(0, `hsla(${h}, 70%, 35%, 0.16)`); gr.addColorStop(0.5, `hsla(${h}, 60%, 25%, 0.06)`); gr.addColorStop(1, 'transparent');
-    g.fillStyle = gr; g.fillRect(0, 0, W, c.height);
+    g.fillStyle = gr; g.fillRect(0, 0, VIEW.W, c.height);
   }
   if (bgCache.size > 8) bgCache.clear();
   bgCache.set(key, c);
@@ -43,7 +42,7 @@ export function roundRect(ctx, x, y, w, h, r) {
 /** Stars + nebula only (menus). */
 export function renderBackdrop(ctx, game, now, theme = { hue: 225, hue2: 270 }) {
   const t = now / 1000;
-  ctx.drawImage(nebula(theme.hue, theme.hue2), 0, -H + ((t * 6) % H), W, H * 2);
+  ctx.drawImage(nebula(theme.hue, theme.hue2), 0, -VIEW.H + ((t * 6) % VIEW.H), VIEW.W, VIEW.H * 2);
   drawStars(ctx, game, t, 0);
 }
 
@@ -52,7 +51,7 @@ function drawStars(ctx, game, t, warp) {
   ctx.fillStyle = '#cfd8ff';
   for (const s of game.stars) {
     s.y += s.z * speed * 0.016;
-    if (s.y > H) { s.y -= H; s.x = Math.random() * W; }
+    if (s.y > VIEW.H) { s.y -= VIEW.H; s.x = Math.random() * VIEW.W; }
     const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 1.3 + s.tw));
     if (warp > 0.05) {
       ctx.globalAlpha = 0.25 + 0.5 * warp;
@@ -71,7 +70,7 @@ export function renderGame(ctx, game, now) {
   if (game.shake && !reducedMotion) ctx.translate((Math.random() - 0.5) * game.shake, (Math.random() - 0.5) * game.shake);
 
   const neb = nebula(theme.hue, theme.hue2);
-  ctx.drawImage(neb, 0, -H + ((t * 6 + game.warp * t * 200) % H), W, H * 2);
+  ctx.drawImage(neb, 0, -VIEW.H + ((t * 6 + game.warp * t * 200) % VIEW.H), VIEW.W, VIEW.H * 2);
   drawStars(ctx, game, t, game.warp);
 
   // ── Defense perimeter ──
@@ -79,7 +78,7 @@ export function renderGame(ctx, game, now) {
   const danger = Math.max(0, (maxP - 0.55) / 0.45);
   ctx.strokeStyle = `rgba(255, ${Math.round(80 + 140 * (1 - danger))}, ${Math.round(120 * (1 - danger))}, ${0.12 + danger * (0.35 + 0.25 * Math.sin(t * 14))})`;
   ctx.lineWidth = 2; ctx.setLineDash([10, 12]); ctx.lineDashOffset = -t * 30;
-  ctx.beginPath(); ctx.moveTo(40, LAYOUT.IMPACT_Y); ctx.lineTo(W - 40, LAYOUT.IMPACT_Y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(40, LAYOUT.IMPACT_Y); ctx.lineTo(VIEW.W - 40, LAYOUT.IMPACT_Y); ctx.stroke();
   ctx.setLineDash([]);
 
   // ── Threats ──
@@ -116,7 +115,7 @@ export function renderGame(ctx, game, now) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const p of game.popups) {
     ctx.globalAlpha = Math.min(1, p.life * 2.5);
-    const pop = p.big ? 1 + Math.max(0, p.life - 1.5) * 0.6 : 1;
+    const pop = (p.big ? 1 + Math.max(0, p.life - 1.5) * 0.6 : 1) * (p.big ? Math.min(VIEW.ts, (VIEW.W - 40) / (p.size * p.text.length * 0.8)) : VIEW.ts);
     ctx.font = `900 ${p.size * pop}px ${FONT}`;
     ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,10,0.8)';
     ctx.strokeText(p.text, p.x, p.y);
@@ -129,13 +128,13 @@ export function renderGame(ctx, game, now) {
   }
   ctx.globalAlpha = 1;
 
-  if (game.flash > 0) { ctx.fillStyle = `rgba(255, 20, 50, ${game.flash * (reducedMotion ? 0.2 : 0.45)})`; ctx.fillRect(0, 0, W, H); }
-  if (game.healFlash > 0) { ctx.fillStyle = `rgba(80, 255, 170, ${game.healFlash * 0.12})`; ctx.fillRect(0, 0, W, H); }
+  if (game.flash > 0) { ctx.fillStyle = `rgba(255, 20, 50, ${game.flash * (reducedMotion ? 0.2 : 0.45)})`; ctx.fillRect(0, 0, VIEW.W, VIEW.H); }
+  if (game.healFlash > 0) { ctx.fillStyle = `rgba(80, 255, 170, ${game.healFlash * 0.12})`; ctx.fillRect(0, 0, VIEW.W, VIEW.H); }
   const crit = game.hull <= CONFIG.HULL_CRITICAL && game.phase !== 'dying';
-  const vig = ctx.createRadialGradient(W / 2, H / 2, W * 0.28, W / 2, H / 2, W * 0.72);
+  const vig = ctx.createRadialGradient(VIEW.W / 2, VIEW.H / 2, Math.min(VIEW.W, VIEW.H) * 0.52, VIEW.W / 2, VIEW.H / 2, Math.hypot(VIEW.W, VIEW.H) * 0.63);
   vig.addColorStop(0, 'transparent');
   vig.addColorStop(1, crit ? `rgba(120, 0, 20, ${0.55 + 0.25 * Math.sin(t * 6)})` : 'rgba(0, 0, 8, 0.55)');
-  ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = vig; ctx.fillRect(0, 0, VIEW.W, VIEW.H);
   ctx.restore();
 }
 
@@ -351,7 +350,7 @@ export function plateText(th) {
 function drawPlate(ctx, th, isTarget, p) {
   const text = plateText(th);
   const mini = th.mini && !isTarget;
-  const fs = isTarget ? 24 : mini ? 14 : 17;
+  const fs = Math.round((isTarget ? 24 : mini ? 14 : 17) * VIEW.ts);
   ctx.font = `700 ${fs}px ${FONT}`;
   const tw = ctx.measureText(text).width;
   const pw = tw + (isTarget ? 30 : 20), ph = fs + (isTarget ? 16 : 10);
@@ -370,9 +369,9 @@ function drawPlate(ctx, th, isTarget, p) {
   // Caption above the plate
   const cap = th.ally ? 'ALLY · DO NOT FIRE' : th.kind === 'revenant' ? 'REVENANT' : th.kind === 'shield' && th.hp > 1 ? 'SHIELDED ×2' : th.challenge.label;
   if (cap) {
-    ctx.font = `700 10px ${FONT}`;
+    ctx.font = `700 ${Math.round(10 * VIEW.ts)}px ${FONT}`;
     ctx.fillStyle = th.ally ? '#69f0ae' : th.kind === 'revenant' ? '#ea80fc' : th.kind === 'shield' ? '#64ffda' : '#ffd740';
-    ctx.fillText(cap, 0, y + ph + 10);
+    ctx.fillText(cap, 0, y + ph + 10 * VIEW.ts);
   }
 }
 
