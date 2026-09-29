@@ -1,7 +1,7 @@
 # Commercial License — Space Math
 
 **Copyright (C) 2026 Arghyajit Nayak**
-Contact: arghyajit.nayak@humaineeti.ai
+Contact: arghyajitnayak@gmail.com
 
 ---
 
@@ -49,7 +49,7 @@ You need a separate commercial license from the author if you want to do
 
 Pricing is agreed per project. To discuss a license, email:
 
-**arghyajit.nayak@humaineeti.ai**
+**arghyajitnayak@gmail.com**
 
 Please include:
 1. What you are building and how Space Math fits into it

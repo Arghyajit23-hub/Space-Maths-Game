@@ -16,6 +16,6 @@ Space Math is dual-licensed:
 - **Free use** — AGPL-3.0 for personal use, classroom use, and open-source forks that publish their changes. See [LICENSE](LICENSE).
 - **Commercial use** — a separate paid license is required to embed Space Math in a product, charge for access, white-label it, or deploy it without releasing modifications. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md).
 
-**Contact for commercial licensing:** arghyajit.nayak@humaineeti.ai
+**Contact for commercial licensing:** arghyajitnayak@gmail.com
 
 Author: Arghyajit Nayak · Copyright (C) 2026
