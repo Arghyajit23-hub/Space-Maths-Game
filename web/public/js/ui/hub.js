@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════
-//  HUB SCREENS — Welcome, Command Deck, Galaxy Map, Hangar, Brain Map,
-//  Codex, Records, Settings, Parent Zone. (FLOWMAP §1, §4, §7–11)
+//  HUB SCREENS — Welcome, Command Deck, Defense Map, Hangar, Brain Map,
+//  Intel Files, Records, Settings, Parent Zone. (FLOWMAP §1, §4, §7–11)
 //  Each render function fills its <section> and wires its buttons to
 //  the `app` controller passed in from main.js.
 // ════════════════════════════════════════════════════════════════
@@ -19,6 +19,7 @@ import { ACHIEVEMENTS } from '../data/achievements.js';
 import { ALL_SKILLS, SYSTEM_GROUPS } from '../challenges/index.js';
 import { drawShipShape } from '../game/render.js';
 import { THREAT_INFO } from '../config.js';
+import { CHAPTERS, CITIES, swarmDay, citiesProtected } from '../data/story.js';
 
 const P = () => Profile.get();
 const DPR = () => Math.min(devicePixelRatio || 1, 2);
@@ -27,14 +28,14 @@ const DPR = () => Math.min(devicePixelRatio || 1, 2);
 export function renderWelcome(app) {
   const el = $('welcomeScreen');
   el.innerHTML = `
-    <div class="kicker">DEEP SPACE DEFENSE</div>
+    <div class="kicker">EARTH · YEAR 2047</div>
     <h1>SPACE MATH</h1>
-    <div class="tagline">Think fast. Survive longer.</div>
-    <p class="intro">The Static is erasing knowledge across the galaxy. Your mind is the ship's only weapon:
-      solve, remember and reason faster than the threats can reach you.</p>
-    <input id="nameInput" type="text" placeholder="PILOT CALLSIGN" maxlength="16" autocomplete="off" spellcheck="false">
-    <button id="btnBegin" class="btn primary">BEGIN FLIGHT SCHOOL <kbd>Enter</kbd></button>
-    <div class="keys">Takes about a minute. You can change your callsign later.</div>`;
+    <div class="tagline">Every answer is a round. Make it count.</div>
+    <p class="intro">A meteor swarm is falling on Earth in waves, and the munitions factories can't keep up.
+      Join the Interceptors: solve, remember and reason faster than the rocks can reach the line.</p>
+    <input id="nameInput" type="text" placeholder="INTERCEPTOR CALLSIGN" maxlength="16" autocomplete="off" spellcheck="false">
+    <button id="btnBegin" class="btn primary">ENLIST <kbd>Enter</kbd></button>
+    <div class="keys">The story takes a minute, then Flight School. You can change your callsign later.</div>`;
   const input = $('nameInput');
   const go = () => {
     const name = input.value.trim().slice(0, 16);
@@ -55,6 +56,7 @@ function pilotBar() {
     <div class="rank"><div class="r-name">${r.name.toUpperCase()}</div>
       <div class="xpbar"><div style="width:${Math.round(r.progress * 100)}%"></div></div>
       <div class="r-next">${fmt(p.xp)} XP · next rank at ${fmt(r.next)}</div></div>
+    <span class="pill day" title="Days since the swarm was detected">DAY ${swarmDay(p)} OF THE SWARM</span>
     <span class="pill gold" title="Credits">¤ ${fmt(p.credits)}</span>
     ${p.daily.streak ? `<span class="pill fire" title="Daily streak">🔥 ${p.daily.streak}</span>` : ''}
     ${p.fleet ? `<span class="pill cyan" title="Fleet code">⚑ ${esc(p.fleet)}</span>` : ''}
@@ -71,22 +73,24 @@ export function renderDeck(app) {
   const starsTotal = Progress.starsTotal();
   const maxStars = MISSIONS.filter(m => m.kind !== 'tutorial').length * 3;
   const ship = SHIP[p.ship];
+  const saved = citiesProtected(p), cityTotal = Object.keys(CITIES).filter(id => id !== '1-0' && id !== '6-1').length;
+  const ch = next && CHAPTERS[next.system];
   const hero = next
     ? `<button class="tile glass hero" data-act="continue">
         <span class="key"><kbd>Enter</kbd></span>
-        <div class="m-id">${next.kind === 'boss' ? 'DREADNOUGHT · ' : ''}MISSION ${next.id}</div>
+        <div class="m-id">${ch && next.kind !== 'tutorial' ? `CHAPTER ${ch.num} · ` : ''}${next.kind === 'boss' ? 'PLANET-KILLER · ' : ''}MISSION ${next.id}</div>
         <div class="m-name">${esc(next.name)}</div>
         <p>${esc(next.brief)}</p>
-        <div class="t-foot"><span class="pill">${SYSTEMS.find(s => s.id === next.system).name}</span><span class="pill">Level ${next.level}</span><span class="pill">${next.sectors} sector${next.sectors > 1 ? 's' : ''}</span></div>
+        <div class="t-foot"><span class="pill cyan">Defend ${esc(CITIES[next.id] || 'Earth')}</span><span class="pill">${SYSTEMS.find(s => s.id === next.system).name}</span><span class="pill">Level ${next.level}</span><span class="pill">${next.sectors} wave${next.sectors > 1 ? 's' : ''}</span></div>
         <div class="muted" style="font:700 10px var(--orb);letter-spacing:3px;margin-top:16px">THREATS</div>
         <div class="t-foot" style="margin-top:6px">${Object.keys(next.enemies(next.level)).map(k => `<span class="pill">${THREAT_INFO[k].name}</span>`).join('')}</div>
-        ${next.rewards ? `<div class="muted" style="font:700 10px var(--orb);letter-spacing:3px;margin-top:14px">REWARD</div><div class="t-foot" style="margin-top:6px">${next.rewards.crew ? `<span class="pill gold">Crew: ${CREW_BY_ID[next.rewards.crew].name}</span>` : ''}${next.rewards.ship ? '<span class="pill gold">Ship: Phantom</span>' : ''}<span class="pill gold">Codex card</span></div>` : ''}
+        ${next.rewards ? `<div class="muted" style="font:700 10px var(--orb);letter-spacing:3px;margin-top:14px">REWARD</div><div class="t-foot" style="margin-top:6px">${next.rewards.crew ? `<span class="pill gold">Crew: ${CREW_BY_ID[next.rewards.crew].name}</span>` : ''}${next.rewards.ship ? '<span class="pill gold">Ship: Phantom</span>' : ''}<span class="pill gold">Intel file</span></div>` : ''}
         <div class="t-foot" style="margin-top:auto"><span class="btn primary small">LAUNCH ▸</span><span class="muted">${p.missions[next.id]?.plays ? `${p.missions[next.id].plays} attempt${p.missions[next.id].plays > 1 ? 's' : ''}` : ''}</span></div>
       </button>`
     : `<button class="tile glass hero" data-act="endless">
         <span class="key"><kbd>Enter</kbd></span>
-        <div class="m-id">GALAXY COMPLETE</div><div class="m-name">Deep Space awaits</div>
-        <p>Every system is clear. How far can you survive in the endless dark?</p>
+        <div class="m-id">THE SWARM IS BROKEN</div><div class="m-name">The Long Watch</div>
+        <p>Earth is safe, but the sky is never empty. How many waves can you hold?</p>
         <div class="t-foot" style="margin-top:14px"><span class="btn primary small">LAUNCH ▸</span></div></button>`;
 
   $('deckScreen').innerHTML = `
@@ -94,16 +98,16 @@ export function renderDeck(app) {
     <div class="deck-grid">
       ${hero}
       <button class="tile glass daily" data-act="daily"><span class="key"><kbd>D</kbd></span>
-        <div class="t-icon">🌍</div><h3>DAILY GALAXY</h3>
-        <p>${dailyDone ? `Today: ${fmt(dailyDone.score)} ${dailyDone.rows.join('')}` : 'Same galaxy for every pilot today. First run counts.'}</p>
+        <div class="t-icon">☄️</div><h3>TODAY'S WAVE</h3>
+        <p>${dailyDone ? `Today: ${fmt(dailyDone.score)} ${dailyDone.rows.join('')}` : 'The same wave for every Interceptor today. First run counts.'}</p>
         <div class="t-foot">${dailyDone ? '<span class="pill">Practice mode</span>' : '<span class="badge-new">NEW TODAY</span>'}${p.daily.streak ? `<span class="pill fire">🔥 ${p.daily.streak}</span>` : ''}</div></button>
       <button class="tile glass deep" data-act="endless"><span class="key"><kbd>E</kbd></span>
-        <div class="t-icon">🌌</div><h3>DEEP SPACE</h3>
-        <p>Endless. Perks every sector. Global leaderboard.</p>
-        <div class="t-foot"><span class="pill gold">Best ${fmt(p.best.endlessScore)}</span>${p.best.endlessSector ? `<span class="pill">Sector ${p.best.endlessSector}</span>` : ''}</div></button>
+        <div class="t-icon">🛰️</div><h3>THE LONG WATCH</h3>
+        <p>Endless waves. A supply drop after each one. Global leaderboard.</p>
+        <div class="t-foot"><span class="pill gold">Best ${fmt(p.best.endlessScore)}</span>${p.best.endlessSector ? `<span class="pill">Wave ${p.best.endlessSector}</span>` : ''}</div></button>
       <button class="tile glass" data-nav="galaxy"><span class="key"><kbd>G</kbd></span>
-        <div class="t-icon">🪐</div><h3>GALAXY MAP</h3>
-        <p>${SYSTEMS.filter(s => Progress.systemUnlocked(s.id)).length} of ${SYSTEMS.length} systems reached.</p>
+        <div class="t-icon">🗺️</div><h3>DEFENSE MAP</h3>
+        <p>${SYSTEMS.filter(s => Progress.systemUnlocked(s.id)).length} of ${SYSTEMS.length} chapters reached.</p>
         <div class="t-foot"><span class="stars">★</span> ${starsTotal} / ${maxStars}</div></button>
       <button class="tile glass" data-nav="hangar"><span class="key"><kbd>H</kbd></span>
         <div class="t-icon">🛠️</div><h3>HANGAR</h3>
@@ -114,8 +118,8 @@ export function renderDeck(app) {
         <p>Pilot DNA: <b>${dna.archetype}</b></p>
         <div class="t-foot"><span class="pill">${ALL_SKILLS.filter(s => Profile.masteryTier(s.id) === 'supernova').length} supernova skills</span></div></button>
       <button class="tile glass" data-nav="codex"><span class="key"><kbd>C</kbd></span>
-        <div class="t-icon">📜</div><h3>CODEX</h3>
-        <p>Restored archive cards — the tricks behind the maths.</p>
+        <div class="t-icon">📁</div><h3>INTEL FILES</h3>
+        <p>Story files and the maths tricks behind them.</p>
         <div class="t-foot"><span class="pill">${p.codex.length} / ${CODEX.length}</span></div></button>
       <button class="tile glass" data-nav="records"><span class="key"><kbd>R</kbd></span>
         <div class="t-icon">🏆</div><h3>RECORDS</h3>
@@ -125,9 +129,10 @@ export function renderDeck(app) {
         <p>Sound, motion, Assist mode, callsign.</p></button>
       <button class="tile glass" data-nav="parent"><div class="t-icon">👪</div><h3>PARENT ZONE</h3>
         <p>Weekly progress report and skill breakdown.</p></button>
-      <div class="tile glass" style="cursor:default"><div class="t-icon">👻</div><h3>REVENANT FLEET</h3>
-        <p>${due ? `${due} past mistake${due > 1 ? 's' : ''} will ambush your next run.` : `${p.revenants.length} tracked · ${p.lifetime.vanquished} vanquished for good.`}</p>
-        <div class="t-foot"><span class="pill">Spaced repetition</span></div></div>
+      <div class="tile glass earth" style="cursor:default"><div class="t-icon">🌍</div><h3>EARTH STATUS</h3>
+        <p>${saved.length ? `${saved.length} of ${cityTotal} cities protected. Latest: ${esc(saved[saved.length - 1])}.` : 'No cities protected yet. The first wave is coming.'}</p>
+        <div class="city-meter"><i style="width:${Math.round((saved.length / cityTotal) * 100)}%"></i></div>
+        <div class="t-foot"><span class="pill" title="Questions you missed come back later">${due ? `☄ ${due} returning fragment${due > 1 ? 's' : ''}` : `☄ ${p.lifetime.vanquished} fragments cleared`}</span></div></div>
     </div>`;
   wire($('deckScreen'), app);
 }
@@ -159,25 +164,29 @@ export function renderGalaxy(app, sysId) {
 
   const sys = SYSTEMS.find(s => s.id === selectedSystem);
   const open = Progress.systemUnlocked(sys.id);
-  const req = sys.requires === 'ALL' ? 'Beat all five Dreadnoughts, or reach a 50 streak.' : sys.requires ? `Defeat the Dreadnought of ${SYSTEMS.find(s => s.id === sys.requires).name}.` : '';
+  const req = sys.requires === 'ALL' ? 'Break all five planet-killers, or reach a 50 streak.' : sys.requires ? `Break the planet-killer of ${SYSTEMS.find(s => s.id === sys.requires).name}.` : '';
+  const chap = CHAPTERS[sys.id];
   const missions = missionsOf(sys.id).map(m => {
     const rec = p.missions[m.id], unlocked = Progress.missionUnlocked(m.id);
     return `<button class="mission ${m.kind === 'boss' ? 'boss' : ''} ${unlocked ? '' : 'locked'}" ${unlocked ? `data-launch="${m.id}"` : ''}>
       <span class="mid">${m.id}</span>
-      <span><div class="mname">${esc(m.name)}</div><div class="mbrief">${esc(m.brief)}</div></span>
+      <span><div class="mname">${esc(m.name)}</div><div class="mbrief"><span class="mcity">${esc(CITIES[m.id] || '')}</span> · ${esc(m.brief)}</div></span>
       <span class="mright">${unlocked ? stars(rec?.stars || 0) : '🔒'}<div class="muted">${rec?.best ? fmt(rec.best) : ''}</div></span></button>`;
   }).join('');
 
-  $('galaxyScreen').innerHTML = `${head('GALAXY MAP', 'Choose a system, then a mission', `<span class="pill gold">★ ${Progress.starsTotal()}</span>`)}
+  $('galaxyScreen').innerHTML = `${head('DEFENSE MAP', 'The swarm\'s path, from the Moon to Earth. Choose a chapter, then a mission', `<span class="pill gold">★ ${Progress.starsTotal()}</span>`)}
     <div class="galaxy-wrap">
       <div class="galaxy-map glass"><svg>${lines}</svg>${nodes}</div>
       <div class="sys-panel glass">
+        <div class="sys-kicker">CHAPTER ${chap.num}${open || !sys.hidden ? ` · ${esc(sys.zone)}` : ''}</div>
         <h3 style="color:hsl(${sys.hue},90%,70%)">${sys.hidden && !open ? '? ? ?' : sys.name.toUpperCase()}</h3>
-        <div class="lore">${open || !sys.hidden ? esc(sys.lore) : 'Something stirs beyond the known systems…'}</div>
+        <div class="lore">${open || !sys.hidden ? esc(sys.lore) : 'Mori is still searching for whatever holds the swarm together…'}</div>
+        ${open && p.seen[`open_${sys.id}`] ? `<button class="btn ghost small replay" data-chapter="${sys.id}">▶ REPLAY CHAPTER STORY</button>` : ''}
         ${open ? `<div class="mission-list scroll">${missions}</div>` : `<div class="unlock">🔒 ${req}</div>`}
       </div>
     </div>`;
   qsa('[data-sys]', $('galaxyScreen')).forEach(b => b.onclick = () => renderGalaxy(app, b.dataset.sys));
+  qsa('[data-chapter]', $('galaxyScreen')).forEach(b => b.onclick = () => app.chapter(b.dataset.chapter));
   wire($('galaxyScreen'), app);
 }
 
@@ -213,7 +222,7 @@ export function renderHangar(app, tab) {
       return `<div class="item glass ${on ? 'equipped' : ''}"><div class="swatch" style="background:linear-gradient(180deg,#fff,${t.color} 30%,transparent)"></div><h4>${t.name}</h4><p>Engine trail colour.</p>${action}</div>`;
     }).join('');
   }
-  $('hangarScreen').innerHTML = `${head('HANGAR', 'Ships change how you play. Crew are earned from Dreadnoughts.', `<span class="pill gold">¤ ${fmt(p.credits)}</span>`)}
+  $('hangarScreen').innerHTML = `${head('HANGAR', 'Ships change how you fly. Crew join you after each planet-killer.', `<span class="pill gold">¤ ${fmt(p.credits)}</span>`)}
     <div class="tabs" style="margin-bottom:14px">${['ships', 'crew', 'trails'].map(t => `<button class="tab ${t === hangarTab ? 'on' : ''}" data-tab="${t}">${t.toUpperCase()}</button>`).join('')}</div>
     <div class="card-grid">${cards}</div>`;
   const root = $('hangarScreen');
@@ -312,11 +321,12 @@ function drawBrain() {
 // ── Codex ──────────────────────────────────────────
 export function renderCodex(app) {
   const p = P();
-  $('codexScreen').innerHTML = `${head('CODEX', `${p.codex.length} of ${CODEX.length} archive cards restored`)}
+  $('codexScreen').innerHTML = `${head('INTEL FILES', `${p.codex.length} of ${CODEX.length} files unlocked`, '<button class="btn ghost small" id="btnReplayIntro">▶ REPLAY OPENING</button>')}
     <div class="codex-grid scroll">${CODEX.map(c => {
       const has = p.codex.includes(c.id);
-      return `<div class="ccard glass ${has ? '' : 'locked'}"><h4>${has ? esc(c.title) : '▮▮▮▮▮▮▮'}</h4><p>${has ? esc(c.body) : `Restore by: ${esc(c.from)}`}</p></div>`;
+      return `<div class="ccard glass ${has ? '' : 'locked'}"><h4>${has ? esc(c.title) : '▮▮▮▮▮▮▮'}</h4>${has && c.intel ? `<div class="intel">${esc(c.intel)}</div>` : ''}<p>${has ? esc(c.body) : `Unlock by: ${esc(c.from)}`}</p></div>`;
     }).join('')}</div>`;
+  $('btnReplayIntro').onclick = () => app.intro(() => app.go('codex'));
   wire($('codexScreen'), app);
 }
 
@@ -338,7 +348,7 @@ export async function renderRecords(app, tab) {
     <div class="rec-wrap">
       <div class="rec-col glass"><h3>MEDALS · ${p.achievements.length}/${ACHIEVEMENTS.length}</h3><div class="scroll" style="flex:1">${ach}</div></div>
       <div class="rec-col glass">
-        <div class="tabs" style="margin-bottom:10px">${[['endless', 'DEEP SPACE'], ['daily', "TODAY'S DAILY"], ['fleet', 'MY FLEET']].map(([k, l]) => `<button class="tab ${k === lbTab ? 'on' : ''}" data-lb="${k}">${l}</button>`).join('')}</div>
+        <div class="tabs" style="margin-bottom:10px">${[['endless', 'THE LONG WATCH'], ['daily', "TODAY'S WAVE"], ['fleet', 'MY FLEET']].map(([k, l]) => `<button class="tab ${k === lbTab ? 'on' : ''}" data-lb="${k}">${l}</button>`).join('')}</div>
         <div id="lbList" class="scroll" style="flex:1"><div class="muted" style="padding:10px">Loading…</div></div>
         <div class="field"><span class="muted" style="font-size:12px">FLEET CODE</span><input id="fleetInput" maxlength="8" placeholder="e.g. 7B2026" value="${esc(p.fleet)}"><button class="btn primary small" id="btnFleet">JOIN</button></div>
         <div class="muted" style="font-size:11px;margin-top:6px">Ask your teacher for your class code. Everyone with the same code shares a fleet board.</div>
@@ -367,7 +377,8 @@ export function renderSettings(app) {
       ${row('sound', 'Sound & music', 'Procedural soundtrack and effects. Shortcut: M')}
       ${row('voice', 'Voice announcements', 'Spoken alerts for sectors and bosses.')}
       ${row('reducedMotion', 'Reduced motion', 'No screen shake, softer flashes.')}
-      ${row('assist', 'Assist mode', '+30% time on every threat. Great for learning — Assist runs are not ranked.')}
+      ${row('assist', 'Assist mode', '+30% time on every meteor and unlimited munitions. Great for learning. Assist runs are not ranked.')}
+      <div class="setting glass"><div><h4>Story</h4><p>Watch the opening of The Swarm again.</p></div><button class="btn ghost small" id="btnStory">▶ REPLAY OPENING</button></div>
       <div class="setting glass"><div><h4>Callsign</h4><p>Shown on leaderboards. Offensive names are replaced automatically.</p></div>
         <div class="field" style="margin:0;min-width:360px"><input id="renameInput" maxlength="16" value="${esc(P().name)}"><button class="btn primary small" id="btnRename">SAVE</button></div></div>
     </div>`;
@@ -376,6 +387,7 @@ export function renderSettings(app) {
     Profile.update(p => { p.settings[b.dataset.set] = !p.settings[b.dataset.set]; });
     app.applySettings(); renderSettings(app);
   });
+  $('btnStory').onclick = () => app.intro(() => app.go('settings'));
   $('btnRename').onclick = () => {
     const n = $('renameInput').value.trim().slice(0, 16);
     if (!n) return toast('Callsign cannot be empty.');

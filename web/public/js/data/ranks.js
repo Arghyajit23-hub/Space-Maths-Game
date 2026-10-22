@@ -1,8 +1,8 @@
 // Pilot ranks by lifetime XP. See docs/FLOWMAP.md §7.
 
 const RANKS = [
-  [0, 'Cadet'], [500, 'Ensign'], [1500, 'Lieutenant'], [3000, 'Lt. Commander'], [5500, 'Commander'],
-  [9000, 'Captain'], [14000, 'Commodore'], [21000, 'Rear Admiral'], [30000, 'Vice Admiral'], [42000, 'Admiral'],
+  [0, 'Cadet'], [500, 'Gunner'], [1500, 'Pilot'], [3000, 'Flight Lead'], [5500, 'Wing Leader'],
+  [9000, 'Squadron Leader'], [14000, 'Commander'], [21000, 'Group Captain'], [30000, 'Air Marshal'], [42000, 'Defender of Earth'],
 ];
 const LEGEND_STEP = 15000;
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];

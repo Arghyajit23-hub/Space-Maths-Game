@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#02030d">
-  <meta name="description" content="Space Math — a competitive space survival game where your mental maths, memory and logic decide how far you get. Explore a galaxy, beat Dreadnoughts, take the Daily Galaxy.">
-  <meta property="og:title" content="Space Math — Think fast. Survive longer.">
-  <meta property="og:description" content="Blast asteroids, crack Splitters, remember Beacon codes and beat the Daily Galaxy. How far can your brain take you?">
+  <meta name="description" content="Space Math — Earth, 2047. A meteor swarm is coming in waves and munitions are running out. Your mental maths, memory and logic are the last line of defense.">
+  <meta property="og:title" content="Space Math — Earth, 2047. Every answer is a round.">
+  <meta property="og:description" content="Join the Interceptors. Break planet-killers, defend 21 cities and make every round count. How far can your brain take you?">
   <meta property="og:type" content="website">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <title>Space Math — Think Fast. Survive Longer.</title>
+  <title>Space Math — Earth, 2047</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
@@ -31,10 +31,11 @@
           <div class="mult-meter"><div id="hudMultFill"></div></div>
           <div id="hudStreak" class="streak">0</div>
         </div>
+        <div id="hudAmmoRow" class="ammo-row hidden"><span class="hud-label">ROUNDS</span><div class="ammo-bar"><div id="hudAmmoFill"></div></div><span id="hudAmmo" class="ammo-val">0</span></div>
         <div id="hudPerks" class="perk-chips"></div>
       </div>
       <div class="hud-center">
-        <div id="hudSector" class="sector-name">SECTOR 1</div>
+        <div id="hudSector" class="sector-name">WAVE 1</div>
         <div class="sector-bar"><div id="hudSectorFill"></div></div>
         <div id="hudSectorHint" class="sector-hint"></div>
       </div>
@@ -67,11 +68,12 @@
 
     <div id="banner" class="hidden"><div id="bannerTitle"></div><div id="bannerSub"></div></div>
     <div id="tip" class="hidden"></div>
+    <div id="radio" class="hidden"></div>
     <div id="toast" class="hidden"></div>
 
     <!-- Perk draft -->
     <section id="draftScreen" class="screen draft hidden">
-      <div class="kicker">SECTOR CLEARED · CHOOSE AN UPGRADE</div>
+      <div class="kicker">WAVE HELD · SUPPLY DROP · CHOOSE ONE</div>
       <div id="draftCards" class="draft-cards"></div>
       <div class="keys">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or click</div>
     </section>
@@ -81,6 +83,7 @@
 
     <!-- ══ SCREENS (content rendered by js/ui/*) ══ -->
     <section id="welcomeScreen" class="screen hidden"></section>
+    <section id="storyScreen" class="screen story hidden"></section>
     <section id="deckScreen" class="screen hub hidden"></section>
     <section id="galaxyScreen" class="screen hub hidden"></section>
     <section id="hangarScreen" class="screen hub hidden"></section>

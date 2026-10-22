@@ -61,21 +61,28 @@ export const CONFIG = {
 
   AUTO_WRONG_AT_LENGTH: true,
 
+  // ── Munitions (story mode) ──
+  AMMO_FACTOR: 1.5,          // rounds per wave = (kills + planet-killer hits) × factor + spare
+  AMMO_SPARE: 4,
+  AMMO_CAP: 99,
+  EMERGENCY_FEED: 2.5,       // seconds per emergency round when the magazine is empty
+  MAGAZINE_ROUNDS: 8,        // Munitions Factory perk
+
   MAX_PARTICLES: 450,
   MAX_DPR: 2,
 };
 
 export const THREAT_INFO = {
-  rock:     { name: 'Asteroid' },
-  saucer:   { name: 'Saucer' },
-  splitter: { name: 'Splitter', tip: 'Solve it whole before it cracks for ×2!' },
-  swarm:    { name: 'Swarm', tip: 'One answer destroys the whole swarm.' },
-  cloaked:  { name: 'Cloaked', tip: 'Read fast — it hides its sum.' },
-  beacon:   { name: 'Beacon', tip: 'Remember the code before it vanishes.' },
-  shield:   { name: 'Shield bearer', tip: 'Needs two answers.' },
-  mirror:   { name: 'Mirror', tip: 'Press 1 or 2.' },
-  ally:     { name: 'Ally cargo', tip: 'Friendly! Do NOT answer green ships.' },
-  revenant: { name: 'Revenant', tip: 'A question you missed before. Beat it now.' },
+  rock:     { name: 'Stony meteor' },
+  saucer:   { name: 'Iron meteor' },
+  splitter: { name: 'Fracturing meteor', tip: 'Solve it whole before it cracks for ×2!' },
+  swarm:    { name: 'Debris cluster', tip: 'One answer, one round, the whole cluster.' },
+  cloaked:  { name: 'Dark meteor', tip: 'Read fast: it hides its sum.' },
+  beacon:   { name: 'Tracking ping', tip: 'Remember the code before the signal drops.' },
+  shield:   { name: 'Ice-crusted meteor', tip: 'Needs two answers: crust, then core.' },
+  mirror:   { name: 'Twin track', tip: 'Press 1 or 2.' },
+  ally:     { name: 'Supply shuttle', tip: 'Friendly! Never answer green shuttles.' },
+  revenant: { name: 'Returning fragment', tip: 'A question you missed before. Beat it now.' },
 };
 
 export function multiplierFor(streak) {

@@ -35,6 +35,16 @@ kbd { font-family: var(--orb); font-size: 10px; padding: 2px 6px; border-radius:
 #hudMultFill { height: 100%; width: 0; background: var(--cyan); transition: width .2s, background .2s; }
 .streak { font-size: 12px; color: rgba(255,255,255,.6); min-width: 60px; }
 .streak::after { content: ' streak'; opacity: .6; }
+.ammo-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.ammo-row .hud-label { font-size: 9px; }
+.ammo-bar { width: 120px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; border: 1px solid rgba(255,215,64,.25); }
+#hudAmmoFill { height: 100%; width: 100%; background: repeating-linear-gradient(90deg, var(--gold) 0 6px, #ff8f00 6px 8px); transition: width .2s; }
+.ammo-val { font-weight: 900; font-size: 15px; color: var(--gold); min-width: 26px; font-variant-numeric: tabular-nums; }
+.ammo-row.low .ammo-val, .ammo-row.low .hud-label { color: #ff9100; }
+.ammo-row.low #hudAmmoFill { background: #ff9100; }
+.ammo-row.dry .ammo-val { color: var(--red); animation: blink .5s infinite; }
+.ammo-row.dry .ammo-bar { border-color: var(--red); }
+.v-narrow .ammo-bar { width: 80px; }
 .hud-center { text-align: center; }
 .sector-name { font-size: 13px; letter-spacing: 3px; color: rgba(255,255,255,.8); }
 .sector-bar { margin: 8px auto 0; width: 320px; max-width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
@@ -172,7 +182,7 @@ body.touch .v-tall #numpad [data-k="3"] { grid-area: k3; } body.touch .v-tall #n
 body.touch .v-tall #numpad [data-k="-"] { grid-area: neg; } body.touch .v-tall #numpad [data-k="del"] { grid-area: del; }
 body.touch .v-tall #numpad .fire { grid-area: fire; grid-column: auto; font-size: 20px; letter-spacing: 3px; }
 body.touch .v-tall #console { left: 50%; bottom: calc(12px + 4 * 74px + 3 * 8px + 18px + var(--safe-b)); min-width: 0; width: calc(100% - 24px); }
-body.touch .v-tall #tip { top: auto; bottom: calc(4 * 74px + 3 * 8px + 120px + var(--safe-b)); }
+body.touch .v-tall #tip { top: calc(250px + var(--safe-t)); bottom: auto; }
 
 @keyframes blink { 50% { opacity: .35; } }
 @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }

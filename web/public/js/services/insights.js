@@ -30,7 +30,7 @@ export function pilotDNA() {
   else if (groups.logic >= 0.6 && groups.logic >= groups.arith) { archetype = 'Pattern Seer'; tagline = 'You see the next move before it happens.'; }
   else if (avg && avg < 1900 && accuracy >= 0.8) { archetype = 'Lightning Calculator'; tagline = 'Answers faster than lasers can travel.'; }
   else if (accuracy >= 0.93) { archetype = 'Precision Pilot'; tagline = 'Rarely misses. Never panics.'; }
-  else if (p.best.survival >= 240) { archetype = 'Iron Hull'; tagline = 'Outlasts everything the galaxy throws at you.'; }
+  else if (p.best.survival >= 240) { archetype = 'Iron Hull'; tagline = 'Outlasts everything the swarm throws at you.'; }
   else if (groups.fraction >= 0.55) { archetype = 'Fraction Hunter'; tagline = 'Parts, percents, portions — all yours.'; }
   else if (accuracy >= 0.75) { archetype = 'Steady Striker'; tagline = 'Reliable under fire, getting faster every day.'; }
   const sorted = [...rows].sort((a, b) => b.m - a.m);
@@ -46,7 +46,7 @@ export function dnaShareText(name) {
   const p = Profile.get();
   return `🚀 Space Math · Pilot DNA\n${name} — ${d.archetype}\n"${d.tagline}"\n` +
     (d.strengths.length ? `Strengths: ${d.strengths.join(', ')}\n` : '') +
-    `Best streak ${p.best.streak} · Deep Space best ${p.best.endlessScore.toLocaleString('en-US')}`;
+    `Best streak ${p.best.streak} · Long Watch best ${p.best.endlessScore.toLocaleString('en-US')}`;
 }
 
 /** Parent Zone — last 7 days vs the 7 before. */

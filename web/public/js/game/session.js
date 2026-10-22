@@ -38,6 +38,8 @@ export class Session {
     this.perks = [];
     this.victory = false;
     this.bossName = null;
+    // Munitions telemetry
+    this.shots = 0; this.wasted = 0; this.refunded = 0; this.dryTime = 0; this.ranDry = false;
     this._sector();
   }
 
@@ -152,6 +154,8 @@ export class Session {
       swarms: this.swarms, cleanBreaks: this.cleanBreaks, flawlessSectors: this.flawlessSectors,
       skills, missed: this.missed, revenantResults: this.revenantResults, timeline: this.timeline,
       perks: this.perks, shareRows: this.shareRows(), bossName: this.bossName,
+      shots: this.shots, wasted: this.wasted, refunded: this.refunded, ranDry: this.ranDry,
+      efficiency: this.shots ? Math.round(((this.shots - this.wasted) / this.shots) * 100) : null,
     };
   }
 }

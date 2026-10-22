@@ -4,7 +4,7 @@ export const $ = id => document.getElementById(id);
 export const qs = (sel, root = document) => root.querySelector(sel);
 export const qsa = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-export const SCREENS = ['welcome', 'deck', 'galaxy', 'hangar', 'brain', 'codex', 'records', 'settings', 'parent', 'pause', 'debrief', 'draft'];
+export const SCREENS = ['welcome', 'deck', 'galaxy', 'hangar', 'brain', 'codex', 'records', 'settings', 'parent', 'pause', 'debrief', 'draft', 'story'];
 
 /** Show exactly one full-screen section (or none with null). */
 export function showScreen(name) {

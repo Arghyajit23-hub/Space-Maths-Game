@@ -3,16 +3,18 @@
 //  keyboard/touch input and the render loop. (FLOWMAP §1)
 // ════════════════════════════════════════════════════════════════
 
-import { CONFIG, VIEW, computeView, multiplierProgress } from './config.js';
+import { CONFIG, VIEW, computeView, multiplierProgress, THREAT_INFO } from './config.js';
 import { fmt, clock, esc } from './core/util.js';
 import { dayKey } from './core/rng.js';
 import { Game } from './game/game.js';
-import { renderGame, renderBackdrop, setReducedMotion, plateText, MULT_COLORS } from './game/render.js';
+import { renderGame, renderBackdrop, renderStoryArt, setReducedMotion, plateText, MULT_COLORS } from './game/render.js';
 import { Sound, speak } from './services/audio.js';
 import { Profile } from './services/profile.js';
 import { Progress } from './services/progression.js';
 import { Leaderboard } from './services/leaderboard.js';
-import { endlessRun, dailyRun, missionRun, MISSION } from './data/galaxy.js';
+import { endlessRun, dailyRun, missionRun, MISSION, SYSTEMS, missionsOf } from './data/galaxy.js';
+import { INTRO, CHAPTERS, BRIEFINGS, CITIES, RADIO, CAST, fill } from './data/story.js';
+import { playScene, storyKey, storyArt, storyActive, setStoryReducedMotion } from './ui/story.js';
 import { PERK } from './data/perks.js';
 import { TRAIL } from './data/ships.js';
 import { ACHIEVEMENTS } from './data/achievements.js';
@@ -83,7 +85,7 @@ if (new URLSearchParams(location.search).has('debug')) window.__game = game; // 
 // ════════════════════════════════════════════
 //  Router
 // ════════════════════════════════════════════
-let ui = 'menu';          // menu | play | paused | draft | debrief
+let ui = 'menu';          // menu | story | play | paused | draft | debrief
 let screen = null;        // current hub screen
 let currentRun = null;
 let overAt = 0;
@@ -94,7 +96,7 @@ function setPlayChrome(on) {
   $('console').classList.toggle('hidden', !on);
   $('numpad').classList.toggle('hidden', !(on && isTouch));
   $('btnPause').classList.toggle('hidden', !on);
-  if (!on) { $('tip').classList.add('hidden'); $('banner').classList.add('hidden'); }
+  if (!on) { $('tip').classList.add('hidden'); $('banner').classList.add('hidden'); $('radio').classList.add('hidden'); }
 }
 
 const app = {
@@ -108,17 +110,17 @@ const app = {
     r(app);
     showScreen(name);
   },
-  launch(id) { startRun(id); },
+  launch(id) { brief(id); },
   action(act) {
-    if (act !== 'continue' && !Profile.get().missions['1-0']?.cleared) { toast('Finish Flight School first, pilot!'); return startRun('1-0'); }
-    if (act === 'continue') { const n = Progress.nextMission(); startRun(n ? n.id : 'endless'); }
+    if (act !== 'continue' && !Profile.get().missions['1-0']?.cleared) { toast('Finish Flight School first, pilot!'); return brief('1-0'); }
+    if (act === 'continue') { const n = Progress.nextMission(); n ? brief(n.id) : startRun('endless'); }
     else if (act === 'daily') startRun('daily');
     else if (act === 'endless') startRun('endless');
   },
   sound(name, arg) { Sound[name]?.(arg); },
   applySettings() {
     const s = Profile.get().settings;
-    Sound.setEnabled(s.sound); Sound.setVoice(s.voice); setReducedMotion(s.reducedMotion);
+    Sound.setEnabled(s.sound); Sound.setVoice(s.voice); setReducedMotion(s.reducedMotion); setStoryReducedMotion(s.reducedMotion);
     $('btnSound').classList.toggle('off', !s.sound); $('btnSound').textContent = s.sound ? '♫' : '✕';
   },
   checkAchievements() {
@@ -128,8 +130,76 @@ const app = {
       try { if (a.test({}, p)) { Profile.update(pp => { pp.achievements.push(a.id); pp.credits += a.reward; }); toast(`🏅 ${a.name} · +¤${a.reward}`); } } catch {}
     }
   },
-  reboot() { app.go(Profile.isNew() ? 'welcome' : 'deck'); },
+  reboot() {
+    if (Profile.isNew()) return app.go('welcome');
+    // Pilots from before the story update see the opening once
+    if (!Profile.get().seen.intro) return app.intro(() => app.go('deck'));
+    app.go('deck');
+  },
+  /** Opening sequence (first launch, or replayed from Settings / Intel Files). */
+  intro(then) {
+    Profile.update(p => { p.seen.intro = true; });
+    story({ kicker: 'THE SWARM', lines: INTRO, onDone: then });
+  },
+  /** Replay a chapter's opening (and its ending, once earned). */
+  chapter(sysId) {
+    const ch = CHAPTERS[sysId]; if (!ch) return;
+    const ended = Profile.get().seen[`end_${sysId}`];
+    story({ kicker: `CHAPTER ${ch.num}`, title: ch.title, art: ch.art, lines: ended ? [...ch.open, ...ch.end] : ch.open, onDone: () => app.go('galaxy') });
+  },
 };
+
+// ════════════════════════════════════════════
+//  Story: scenes, chapter openings, briefings
+// ════════════════════════════════════════════
+function story(opts) {
+  ui = 'story'; screen = null;
+  game.state = 'idle';
+  setPlayChrome(false);
+  playScene({ ...opts, name: Profile.get().name, sound: n => Sound[n]?.() });
+  showScreen('story');
+}
+
+/** Launch path for story missions: chapter opening (first time) → briefing card → run. */
+function brief(id) {
+  const m = MISSION[id];
+  if (!m) return startRun(id);
+  const p = Profile.get();
+  if (!p.seen.intro) return app.intro(() => brief(id));
+  const ch = CHAPTERS[m.system];
+  const openKey = `open_${m.system}`;
+  const chapterLines = ch && !p.seen[openKey] && m.kind !== 'tutorial' ? ch.open.map(l => ({ ...l, art: ch.art })) : [];
+  if (chapterLines.length) Profile.update(pp => { pp.seen[openKey] = true; });
+  const run = missionRun(id);
+  const ammo = run.kind === 'tutorial' || p.settings.assist ? null
+    : Math.ceil((run.sectorKills(1) + run.bossHp(1)) * CONFIG.AMMO_FACTOR) + CONFIG.AMMO_SPARE;
+  const threats = Object.keys(run.enemies(run.level)).map(k => `<span class="pill">${THREAT_INFO[k].name}</span>`).join('');
+  const final = {
+    button: 'LAUNCH',
+    html: `<div class="brief-card">
+      <div class="b-id">${m.kind === 'boss' ? 'PLANET-KILLER · ' : ''}MISSION ${esc(m.id)}${ch ? ` · CHAPTER ${ch.num}` : ''}</div>
+      <div class="b-name">${esc(m.name)}</div>
+      <p>${esc(m.brief)}</p>
+      <div class="b-grid">
+        <div><span>DEFEND</span><b>${esc(CITIES[id] || 'Earth')}</b></div>
+        <div><span>WAVES</span><b>${m.sectors}</b></div>
+        <div><span>MUNITIONS</span><b>${ammo == null ? 'Unlimited' : `${ammo} rounds`}</b></div>
+        <div><span>BEST</span><b>${p.missions[id]?.stars ? '★'.repeat(p.missions[id].stars) : '–'}</b></div>
+      </div>
+      <div class="b-threats">${threats}</div>
+      ${ammo != null ? '<div class="b-note">A wrong answer wastes a round. BLAZING answers recover theirs.</div>' : ''}
+    </div>`,
+  };
+  story({
+    kicker: chapterLines.length ? `CHAPTER ${ch.num}` : `MISSION ${m.id} BRIEFING`,
+    title: chapterLines.length ? ch.title : m.name,
+    art: ch?.art || 'earth',
+    lines: [...chapterLines, ...(BRIEFINGS[id] || [])],
+    final,
+    onDone: () => startRun(id),
+    onCancel: () => app.go('deck'),
+  });
+}
 
 // ════════════════════════════════════════════
 //  Runs
@@ -142,6 +212,7 @@ function buildRun(id) {
 
 async function startRun(id) {
   Sound.unlock(); Sound.click();
+  showScreen(null);
   const p = Profile.get();
   const run = buildRun(id);
   currentRun = run;
@@ -175,6 +246,8 @@ const el = {
   score: $('hudScore'), mult: $('hudMult'), multFill: $('hudMultFill'), streak: $('hudStreak'), perks: $('hudPerks'),
   sector: $('hudSector'), sectorFill: $('hudSectorFill'), sectorHint: $('hudSectorHint'),
   hullFill: $('hudHullFill'), hull: $('hudHull'), time: $('hudTime'), ghost: $('hudGhost'), rival: $('hudRival'),
+  ammoRow: $('hudAmmoRow'), ammoFill: $('hudAmmoFill'), ammo: $('hudAmmo'),
+  radio: $('radio'),
   console: $('console'), label: $('consoleLabel'), prompt: $('consolePrompt'), value: $('consoleValue'), note: $('consoleNote'),
   banner: $('banner'), bannerTitle: $('bannerTitle'), bannerSub: $('bannerSub'), tip: $('tip'),
 };
@@ -197,9 +270,17 @@ game.on.hud = g => {
     el.perks.innerHTML = s.perks.map(id => `<span title="${PERK[id].name}: ${PERK[id].desc}" style="color:${PERK[id].color}">${PERK[id].icon}</span>`).join('');
   }
 
+  // Munitions
+  el.ammoRow.classList.toggle('hidden', !g.ammoOn);
+  if (g.ammoOn) {
+    el.ammo.textContent = g.ammo;
+    el.ammoFill.style.width = `${Math.min(1, g.ammo / Math.max(1, g.ammoMax)) * 100}%`;
+    el.ammoRow.className = `ammo-row ${g.ammo < 1 ? 'dry' : g.ammo <= Math.max(3, g.ammoMax * 0.2) ? 'low' : ''}`;
+  }
+
   const run = g.run;
-  const secTxt = run.sectors === Infinity ? `SECTOR ${g.sector} · ${g.theme.name.toUpperCase()}`
-    : run.kind === 'daily' ? `DAILY GALAXY · SECTOR ${g.sector}/${run.sectors}`
+  const secTxt = run.sectors === Infinity ? `WAVE ${g.sector} · ${g.theme.name.toUpperCase()}`
+    : run.kind === 'daily' ? `TODAY'S WAVE · ${g.sector}/${run.sectors}`
     : `${run.id} · ${run.title.toUpperCase()}${run.sectors > 1 ? ` · ${g.sector}/${run.sectors}` : ''}`;
   el.sector.textContent = secTxt;
   const boss = g.boss;
@@ -211,7 +292,7 @@ game.on.hud = g => {
     el.sectorFill.classList.remove('boss');
     el.sectorFill.style.width = `${Math.min(1, g.sectorKills / g.sectorGoal) * 100}%`;
     const left = Math.max(0, g.sectorGoal - g.sectorKills);
-    el.sectorHint.textContent = left ? `${left} TO MOTHERSHIP` : '';
+    el.sectorHint.textContent = left ? `${left} TO PLANET-KILLER` : '';
   }
   const hull = Math.round(g.hull), max = g.mods.hullMax;
   el.hull.textContent = hull;
@@ -222,7 +303,7 @@ game.on.hud = g => {
   if (run.kind === 'endless' || run.kind === 'daily') {
     const rival = Leaderboard.rivalAbove(board, s.score);
     if (rival) { el.rival.classList.remove('hidden', 'pass'); el.rival.textContent = `NEXT: ${rival.name} · ${fmt(rival.score - s.score)} to pass`; }
-    else if (board.length && s.score > 0) { el.rival.classList.remove('hidden'); el.rival.classList.add('pass'); el.rival.textContent = run.kind === 'daily' ? "★ #1 TODAY" : '★ #1 GALACTIC PILOT'; }
+    else if (board.length && s.score > 0) { el.rival.classList.remove('hidden'); el.rival.classList.add('pass'); el.rival.textContent = run.kind === 'daily' ? "★ #1 TODAY" : '★ #1 INTERCEPTOR'; }
     else el.rival.classList.add('hidden');
     if (lastRival && rival !== lastRival && s.score > lastRival.score) { el.rival.classList.add('pass'); setTimeout(() => el.rival.classList.remove('pass'), 600); }
     lastRival = rival;
@@ -262,7 +343,8 @@ function flashConsole(cls) {
 game.on.feedback = (type, data) => {
   if (type === 'correct') flashConsole('ok');
   else if (type === 'wrong') { flashConsole('bad'); note('MISS — hull hit', 'reveal'); }
-  else if (type === 'friendly') { flashConsole('bad'); note('FRIENDLY FIRE — never answer green ships', 'reveal'); }
+  else if (type === 'friendly') { flashConsole('bad'); note('FRIENDLY FIRE: never answer green shuttles', 'reveal'); }
+  else if (type === 'dry') { flashConsole('bad'); note('MAGAZINE EMPTY · EMERGENCY ROUND INBOUND', 'reveal'); }
   else if (type === 'timeout') { flashConsole('bad'); note(`IMPACT · ${data.explain}`, 'reveal'); }
   else if (type === 'mult') { el.mult.classList.remove('pop'); void el.mult.offsetWidth; el.mult.classList.add('pop'); }
 };
@@ -278,6 +360,18 @@ game.on.tip = text => {
   clearTimeout(tipTimer); tipTimer = setTimeout(() => el.tip.classList.add('hidden'), 4200);
 };
 game.on.record = () => speak('New personal best!');
+
+// Radio chatter: a portrait, a name and one line, for a few seconds
+let radioTimer = null;
+game.on.radio = key => {
+  const pool = RADIO[key]; if (!pool || ui !== 'play') return;
+  const line = pool[Math.floor(Math.random() * pool.length)], who = CAST[line.who];
+  el.radio.innerHTML = `<span class="st-face" style="--c:${who.color}">${who.glyph}</span><div><b style="color:${who.color}">${esc(who.name)}</b><p>${esc(fill(line.text, Profile.get().name))}</p></div>`;
+  el.radio.classList.remove('hidden');
+  el.radio.style.animation = 'none'; void el.radio.offsetWidth; el.radio.style.animation = '';
+  Sound.click?.();
+  clearTimeout(radioTimer); radioTimer = setTimeout(() => el.radio.classList.add('hidden'), 4200);
+};
 
 game.on.draft = offer => {
   if (!offer) { ui = 'play'; showScreen(null); setPlayChrome(true); return; }
@@ -296,6 +390,20 @@ function pickPerk(i) { if (ui === 'draft') game.choosePerk(i); }
 game.on.over = async (summary, session) => {
   const run = currentRun, p = Profile.get();
   setPlayChrome(false);
+  // Chapter ending: the first time a chapter's planet-killer (or the final wave) falls
+  const ch = run.system && CHAPTERS[run.system];
+  const endKey = `end_${run.system}`;
+  if (summary.victory && ch && (run.kind === 'boss' || run.id === '6-1') && !p.seen[endKey]) {
+    Profile.update(pp => { pp.seen[endKey] = true; });
+    return story({ kicker: `CHAPTER ${ch.num} · COMPLETE`, title: ch.title, art: run.id === '6-1' ? 'stars' : ch.art,
+      lines: ch.end, onDone: () => showDebrief(summary, session) });
+  }
+  showDebrief(summary, session);
+};
+
+async function showDebrief(summary, session) {
+  const run = currentRun, p = Profile.get();
+  setPlayChrome(false);
   const report = Progress.applyRun(summary, run, { assist: p.settings.assist, creditsMult: game.mods.creditsMult });
   overAt = performance.now();
   ui = 'debrief';
@@ -305,21 +413,21 @@ game.on.over = async (summary, session) => {
     summary, session, report, run, name: p.name, assist: p.settings.assist, nextMission: lastNext,
     sound: (n, a) => Sound[n]?.(a),
     onRetry: () => startRun(run.kind === 'daily' ? 'daily' : run.id),
-    onNext: () => lastNext && startRun(lastNext.id),
+    onNext: () => lastNext && brief(lastNext.id),
     onDeck: () => app.go('deck'),
   });
   showScreen('debrief');
-  const line = summary.victory ? `Mission complete. ${summary.score} points.` : run.kind === 'endless' ? `Ship down in sector ${summary.sector}.` : 'Ship down. Relaunch when ready.';
+  const line = summary.victory ? `${CITIES[run.id] && run.id !== '1-0' ? CITIES[run.id] + ' is safe.' : 'Mission complete.'} ${summary.score} points.` : run.kind === 'endless' ? `Interceptor down on wave ${summary.sector}.` : 'Interceptor down. Relaunch when ready.';
   setTimeout(() => speak(line), 500);
 
-  // Leaderboards: Deep Space always, Daily only for the official first attempt. Assist runs are never ranked.
+  // Leaderboards: The Long Watch always, Today's Wave only for the official first attempt. Assist runs are never ranked.
   if (p.settings.assist) return;
   if (run.kind === 'endless' || (run.kind === 'daily' && report.dailyOfficial)) {
     const mode = run.kind === 'daily' ? 'daily' : 'endless';
     const entries = await Leaderboard.submit(summary, { name: p.name, mode, day: run.day, fleet: p.fleet });
-    if (entries.length && ui === 'debrief') setDebriefRank(`${mode === 'daily' ? 'Today' : 'Galactic'} rank <b style="color:var(--cyan)">#${Leaderboard.rankFor(entries, summary.score)}</b> of ${entries.length}`);
+    if (entries.length && ui === 'debrief') setDebriefRank(`${mode === 'daily' ? 'Today' : 'Global'} rank <b style="color:var(--cyan)">#${Leaderboard.rankFor(entries, summary.score)}</b> of ${entries.length}`);
   }
-};
+}
 
 // ════════════════════════════════════════════
 //  Pause
@@ -328,7 +436,7 @@ function pauseRun() {
   if (ui !== 'play' || game.state !== 'play') return;
   game.pause(); ui = 'paused'; Sound.stopMusic();
   $('pauseScreen').innerHTML = `<h2>SYSTEMS PAUSED</h2>
-    <div class="muted" style="margin-bottom:18px">${esc(currentRun.kind === 'endless' ? 'Deep Space' : currentRun.title)} · score ${fmt(game.session.score)}</div>
+    <div class="muted" style="margin-bottom:18px">${esc(currentRun.title)} · score ${fmt(game.session.score)}</div>
     <button id="btnResume" class="btn primary">RESUME <kbd>Esc</kbd></button>
     <button id="btnAbort" class="btn ghost">ABANDON RUN <kbd>Q</kbd></button>`;
   $('btnResume').onclick = resumeRun; $('btnAbort').onclick = abandon;
@@ -349,6 +457,7 @@ document.addEventListener('keydown', e => {
   const k = e.key;
   const typing = e.target.tagName === 'INPUT';
   if ((k === 'm' || k === 'M') && !typing) { toggleSound(); return; }
+  if (ui === 'story') { storyKey(e); return; }
 
   if (ui === 'play') {
     if (k === 'Escape' || k === 'p' || k === 'P') { e.preventDefault(); pauseRun(); return; }
@@ -423,7 +532,8 @@ function frame(now) {
       }
     }
   }
-  if (ui === 'menu') renderBackdrop(ctx, game, now);
+  if (ui === 'story') renderStoryArt(ctx, game, now, storyArt());
+  else if (ui === 'menu') renderBackdrop(ctx, game, now);
   else renderGame(ctx, game, now);
   requestAnimationFrame(frame);
 }

@@ -10,17 +10,17 @@ export const SHIPS = [
   { id: 'gunship', name: 'Gunship', cost: 1200, color: '#ff6e40', shape: 'gunship',
     trait: '+20% points, but max hull 85.', apply: m => { m.pointsMult *= 1.2; m.hullMax -= 15; } },
   { id: 'carrier', name: 'Carrier', cost: 2000, color: '#b388ff', shape: 'carrier',
-    trait: 'Once per sector a drone destroys the easiest threat.', apply: m => { m.carrier = true; } },
-  { id: 'phantom', name: 'Phantom', cost: null, unlock: 'Beat The Singularity', color: '#e040fb', shape: 'phantom',
+    trait: 'Once per wave a drone destroys the easiest meteor (free round).', apply: m => { m.carrier = true; } },
+  { id: 'phantom', name: 'Phantom', cost: null, unlock: 'Destroy the Heart of the Swarm', color: '#e040fb', shape: 'phantom',
     trait: 'Starts every run with a random perk.', apply: m => { m.phantom = true; } },
 ];
 
 export const CREW = [
-  { id: 'rao', name: 'Engineer Rao', from: 'The Carry Titan', icon: '🔧', perk: '+10 max hull.', apply: m => { m.hullMax += 10; } },
-  { id: 'ayo', name: 'Medic Ayo', from: 'The Fraction Leviathan', icon: '✚', perk: 'Repair drone every 8-streak (not 10).', apply: m => { m.repairEvery = 8; } },
-  { id: 'mira', name: 'Archivist Mira', from: 'The Amnesia Engine', icon: '📜', perk: 'Memory signals stay visible 40% longer.', apply: m => { m.revealMult *= 1.4; } },
-  { id: 'kade', name: 'Gunner Kade', from: 'The Exponent Colossus', icon: '🎯', perk: 'Every 5th Mothership hit deals double.', apply: m => { m.gunner = true; } },
-  { id: 'vega', name: 'Navigator Vega', from: 'The Paradox Core', icon: '🧭', perk: 'Mirror and pattern threats get +25% time.', apply: m => { m.choiceTimeMult *= 1.25; } },
+  { id: 'rao', name: 'Engineer Hollis', from: 'Titan-1', icon: '🔧', perk: '+10 max hull.', apply: m => { m.hullMax += 10; } },
+  { id: 'ayo', name: 'Medic Ayo', from: 'The Splinter', icon: '✚', perk: 'Repair drone every 8-streak (not 10).', apply: m => { m.repairEvery = 8; } },
+  { id: 'mira', name: 'Signals Officer Mira', from: 'The Ghost Rock', icon: '📜', perk: 'Tracking pings stay visible 40% longer.', apply: m => { m.revealMult *= 1.4; } },
+  { id: 'kade', name: 'Gunner Kade', from: 'Atlas Mass', icon: '🎯', perk: 'Every 5th planet-killer hit deals double.', apply: m => { m.gunner = true; } },
+  { id: 'vega', name: 'Navigator Vega', from: 'The Twin', icon: '🧭', perk: 'Twin tracks and patterns get +25% time.', apply: m => { m.choiceTimeMult *= 1.25; } },
 ];
 
 export const TRAILS = [

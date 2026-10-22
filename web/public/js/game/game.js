@@ -6,6 +6,11 @@
 //          draft (perk pick) → warp → wave … → victory | dying
 //  UI talks to the game through `game.on.*` callbacks and
 //  `type() / backspace() / submit() / choosePerk()`.
+//
+//  Munitions (story mode): every shot spends a round, a wrong answer
+//  wastes one, BLAZING answers recover theirs. Each wave brings a
+//  supply allotment; when the magazine is empty an emergency feed
+//  trickles single rounds so a run can never soft-lock.
 // ════════════════════════════════════════════════════════════════
 
 import { CONFIG, THREAT_INFO, VIEW } from '../config.js';
@@ -30,7 +35,7 @@ function rockShape() {
 
 export class Game {
   constructor() {
-    this.on = { hud: noop, target: noop, input: noop, feedback: noop, banner: noop, over: noop, record: noop, draft: noop, tip: noop };
+    this.on = { hud: noop, target: noop, input: noop, feedback: noop, banner: noop, over: noop, record: noop, draft: noop, tip: noop, radio: noop };
     this.state = 'idle';
     this.stars = Array.from({ length: 260 }, () => ({ x: Math.random() * VIEW.W, y: Math.random() * VIEW.H, z: Math.random() * 2.6 + 0.4, tw: Math.random() * 6.28 }));
     this.reset({ run: { id: 'idle', kind: 'idle', level: 1, sectors: 1, enemies: () => ({ rock: 1 }), sectorKills: () => 1, bossHp: () => 1 } });
@@ -80,10 +85,48 @@ export class Game {
     this.tipsShown = new Set();
     this.bossHits = 0;
     this.spawnIndex = 0;
+    this.radioSaid = new Set();
+    // Munitions: off for the tutorial, Assist mode and the idle backdrop game
+    this.ammoOn = !['tutorial', 'idle'].includes(run.kind) && !opts.assist && run.munitions !== false;
+    this.ammo = this.ammoOn ? this._allotment(1) + this.revenantQueue.length : Infinity;
+    this.ammoMax = this.ammo;
+    this.dryT = 0;
     this._sectorReset();
   }
 
+  // ── Munitions ────────────────────────────────────
+  /** Rounds issued for a wave: enough for a clean run plus a safety margin. */
+  _allotment(sector) {
+    const need = this.run.sectorKills(sector) + this.run.bossHp(sector);
+    return Math.ceil(need * CONFIG.AMMO_FACTOR) + CONFIG.AMMO_SPARE + this.mods.magazine;
+  }
+
+  get dry() { return this.ammoOn && this.ammo < 1; }
+
+  /** Spend one round. `wasted` = it hit nothing. */
+  _spend(wasted = false) {
+    if (!this.ammoOn) return;
+    this.ammo = Math.max(0, this.ammo - 1);
+    this.session.shots++;
+    if (wasted) { this.session.wasted++; this._radio('wasted'); }
+    if (this.ammo <= Math.max(3, Math.floor(this.ammoMax * 0.2)) && !this.ammoWarned && this.ammo > 0) { this.ammoWarned = true; this._radio('ammoLow', false); }
+    if (this.ammo < 1) { this.session.ranDry = true; this.dryT = 0; this._radio('dry', false); Sound.alarm(); }
+  }
+
+  _refund(x, y) {
+    if (!this.ammoOn) return;
+    this.ammo++; this.session.refunded++;
+    this.popups.push({ x, y, text: '+1 ROUND', life: 0.8, color: '#ffd740', size: 14 });
+  }
+
+  _radio(key, once = true) {
+    if (once && this.radioSaid.has(key)) return;
+    this.radioSaid.add(key);
+    this.on.radio(key);
+  }
+
   _sectorReset() {
+    this.ammoWarned = false;
     this.deflectLeft = this.mods.deflector;
     this.steadyLeft = this.mods.steady;
     this.droneReady = this.mods.carrier;
@@ -123,8 +166,8 @@ export class Game {
   start(opts) {
     this.reset(opts);
     this.state = 'play';
-    this.on.banner(this.run.kind === 'endless' || this.run.kind === 'daily' ? `SECTOR 1` : this.run.id, this.run.kind === 'endless' ? 'Deep Space' : this.run.title, 'sector');
-    if (this.run.kind === 'tutorial') this._tip('Type the answer shown on the asteroid — your laser fires by itself.', 'intro');
+    this.on.banner(this.run.kind === 'endless' || this.run.kind === 'daily' ? `WAVE 1` : this.run.id, this.run.kind === 'endless' ? 'The Long Watch' : this.run.title, 'sector');
+    if (this.run.kind === 'tutorial') this._tip('Type the answer shown on the meteor. Your gun fires by itself.', 'intro');
     this.on.hud(this);
     this.on.target(null);
     this.on.input('');
@@ -137,6 +180,7 @@ export class Game {
   _applyPerk(id, silent = false) {
     PERK[id].apply(this.mods);
     this.session.perks.push(id);
+    if (id === 'magazine' && this.ammoOn) { this.ammo += CONFIG.MAGAZINE_ROUNDS; this.ammoMax = Math.max(this.ammoMax, this.ammo); }
     if (id === 'glass') this.hull = Math.min(this.hull, this.mods.hullMax);
     if (!silent) this.on.hud(this);
   }
@@ -195,6 +239,7 @@ export class Game {
     this.deferT = 0;
     const input = this.input;
     if (!input || input === '-') return;
+    if (this.dry) { this.on.feedback('dry', {}); return; }   // answer is held until the emergency feed delivers a round
     const live = this._live(), allies = this._allies();
     const all = [...live, ...allies];
     if (!all.length) return;
@@ -222,6 +267,7 @@ export class Game {
     if (th.group) { special = CONFIG.SWARM_MULT; label = 'SWARM CLEARED!'; this.session.swarms++; }
     if (th.kind === 'revenant') { special = CONFIG.REVENANT_MULT; label = 'REVENANT BANISHED'; this.session.revenantResults.push({ key: ch.revenantKey, beaten: true }); }
     const primeHit = this.mods.prime && !ch.choice && isPrime(ans);
+    this._spend();
     const res = this.session.onCorrect(ch, Math.round(th.qElapsed * 1000), ratio, {
       level: this.level, boss: isBoss, special: special * (primeHit ? 2 * this.mods.prime : 1),
       pointsMult: this.mods.pointsMult, streakGain: 1 + this.mods.overclock,
@@ -233,7 +279,8 @@ export class Game {
     this.lasers.push({ x1: s.x, y1: s.y - 34, x2: th.x, y2: th.y, life: 1, mult: res.mult });
     s.recoil = 1; s.aim = Math.atan2(th.y - s.y, th.x - s.x);
     Sound.laser(res.mult); Sound.correct(res.mult);
-    if (res.fast) Sound.fast();
+    if (res.fast) { Sound.fast(); this._refund(s.x + 50, s.y - 40); }
+    if (this.session.streak >= 10) this._radio('streak');
     const sub = label || (res.fast ? 'BLAZING!' : res.clutch ? 'CLUTCH!' : primeHit ? 'PRIME!' : null);
     this.popups.push({ x: th.x, y: th.y - (th.size || 40) - 10, text: `+${res.points}`, sub, life: 1.2, color: res.fast || label ? '#ffd740' : '#69f0ae', size: 26 });
 
@@ -252,6 +299,7 @@ export class Game {
       this._burst(th.x + rand(-40, 40), th.y + rand(-10, 20), 40, th.hue, 7);
       this.shake = Math.max(this.shake, 8);
       if (dmg > 1) this.popups.push({ x: th.x, y: th.y - 110, text: 'DOUBLE HIT', life: 1, color: '#ff6e40', size: 20 });
+      if (th.hp > 0 && th.hp <= th.maxHp / 2) this._radio('bossHalf');
       if (th.hp <= 0) this._destroyBoss(th);
       else { this.director.reseed(`b${this.sector}-${this.bossHits}`); this._setChallenge(th, this.director.bossChallenge(this.level)); if (th === this.target) this.on.target(th.challenge, th); }
     } else if (th.kind === 'shield' && th.hp > 1) {
@@ -312,12 +360,13 @@ export class Game {
     const keep = this.steadyLeft > 0 && this.session.streak > 0;
     if (keep) { this.steadyLeft--; this.popups.push({ x: this.ship.x, y: this.ship.y - 100, text: 'STEADY HANDS', life: 0.9, color: '#ea80fc', size: 16 }); }
     this.session.onWrong(th.challenge, { keepStreak: keep });
+    if (!this.mods.recycler) this._spend(true);
     this.director.report('wrong');
     Sound.wrong();
     this._damage(CONFIG.DAMAGE_WRONG * (1 + this.mods.overclock), false);
-    this.popups.push({ x: this.ship.x, y: this.ship.y - 70, text: 'MISS', life: 0.8, color: '#ff5252', size: 22 });
+    this.popups.push({ x: this.ship.x, y: this.ship.y - 70, text: 'MISS', sub: this.ammoOn && !this.mods.recycler ? 'ROUND WASTED' : null, life: 0.9, color: '#ff5252', size: 22 });
     this.on.feedback('wrong', { input: this.input });
-    if (this.run.kind === 'tutorial') this._tip('Missed — that costs a little hull. Backspace fixes typos before you finish.', 'miss');
+    if (this.run.kind === 'tutorial') this._tip('Missed: that costs a little hull. Backspace fixes typos before you finish.', 'miss');
     this.clearInput();
     this.on.hud(this);
   }
@@ -328,9 +377,10 @@ export class Game {
     this.director.report('wrong');
     Sound.wrong();
     this.lasers.push({ x1: this.ship.x, y1: this.ship.y - 34, x2: th.x, y2: th.y, life: 1, mult: 0 });
+    this._spend(true);
     this._destroy(th);
     this._damage(CONFIG.DAMAGE_FRIENDLY, false);
-    this.popups.push({ x: th.x, y: th.y - 40, text: 'FRIENDLY FIRE!', sub: 'Green ships are allies', life: 1.4, color: '#ff5252', size: 22 });
+    this.popups.push({ x: th.x, y: th.y - 40, text: 'FRIENDLY FIRE!', sub: 'Green shuttles carry our supplies', life: 1.4, color: '#ff5252', size: 22 });
     this.on.feedback('friendly', {});
     this.clearInput();
     this._retarget();
@@ -346,6 +396,7 @@ export class Game {
     this.director.report('timeout');
     const why = explain(ch);
     this.on.feedback('timeout', { explain: why });
+    this._radio('impact');
     this.popups.push({ x: th.x, y: th.y - 40, text: why, life: 2.2, color: '#ff8a80', size: 20 });
     if (this.deflectLeft > 0 && !isBoss) {
       this.deflectLeft--;
@@ -363,7 +414,7 @@ export class Game {
     } else {
       for (const m of group) { m.dying = true; m.dieT = 0.3; m.impacted = true; }
     }
-    if (this.run.kind === 'tutorial') this._tip('Threats that reach your ship hit hard. The correct answer flashes — remember it!', 'impact');
+    if (this.run.kind === 'tutorial') this._tip('Meteors that reach the defense line hit hard. The correct answer flashes, so remember it!', 'impact');
     this.clearInput();
     this._retarget(true);
     this.on.hud(this);
@@ -376,6 +427,7 @@ export class Game {
     this.ship.hit = 1;
     this.shake = Math.max(this.shake, big ? 22 : 7);
     this.flash = Math.max(this.flash, big ? 0.55 : 0.22);
+    if (this.hull <= CONFIG.HULL_CRITICAL && this.hull > 0) this._radio('hullCrit');
     if (this.hull <= 0) this._die();
   }
 
@@ -413,7 +465,7 @@ export class Game {
     const bonus = CONFIG.SECTOR_CLEAR_BONUS * this.level;
     this.session.addBonus(bonus * this.mods.pointsMult);
     if (!this.sectorDamaged) this.session.flawlessSectors++;
-    this.popups.push({ x: VIEW.W / 2, y: VIEW.H / 2 - 60, text: `${th.name.toUpperCase()} DESTROYED`, sub: `SECTOR BONUS +${Math.round(bonus * this.mods.pointsMult)}`, life: 2.4, color: '#ffd740', size: 32, big: true });
+    this.popups.push({ x: VIEW.W / 2, y: VIEW.H / 2 - 60, text: `${th.name.toUpperCase()} DESTROYED`, sub: `WAVE BONUS +${Math.round(bonus * this.mods.pointsMult)}`, life: 2.4, color: '#ffd740', size: 32, big: true });
     this.phase = 'bossDown'; this.phaseT = 0;
   }
 
@@ -504,14 +556,14 @@ export class Game {
       const allowed = Math.max(...this.threats.filter(t => t.group === group).map(t => t.allowed));
       for (const t of this.threats.filter(t => t.group === group)) { t.allowed = allowed; t.rate = 1 / allowed; t.drift = 0; }
       this.lastAllowed = allowed;
-      if (!this.tipsShown.has('swarm')) this._tip(THREAT_INFO.swarm.tip, 'swarm');
+      this._radio('cluster');
     } else if (kind === 'ally') {
       const c = this.director.challengeFor('ally', lvl);
       const fromLeft = RNG.chance(0.5);
       const th = this._makeThreat('ally', c, fromLeft ? -60 : VIEW.W + 60, { ally: true, hue: 130, dir: fromLeft ? 1 : -1, laneY: VIEW.top + RNG.float(0, 120) });
       th.allowed = CONFIG.ALLY_TIME; th.rate = 1 / CONFIG.ALLY_TIME;
       this.threats.push(th);
-      this._tip(THREAT_INFO.ally.tip, 'ally');
+      this._radio('shuttle');
       return; // allies don't consume the spawn slot
     } else {
       const c = this.director.issue(this.director.challengeFor(kind, lvl));
@@ -539,6 +591,7 @@ export class Game {
       this.threats.push(frag);
     });
     this.popups.push({ x: th.x, y: th.y - 40, text: 'CRACKED!', life: 0.8, color: '#80deea', size: 16 });
+    this._radio('fracture');
     this._retarget(true);
   }
 
@@ -558,7 +611,8 @@ export class Game {
     this.threats.push(th);
     this._retarget();
     this.on.hud(this);
-    if (this.run.kind === 'tutorial') this._tip('MOTHERSHIP! Each answer damages it and knocks it back.', 'boss');
+    if (this.run.kind === 'tutorial') this._tip('PLANET-KILLER! Each answer chips it apart and pushes it back.', 'boss');
+    else this._radio('boss', false);
   }
 
   _retarget(force = false) {
@@ -589,7 +643,7 @@ export class Game {
 
     switch (this.phase) {
       case 'intro':
-        if (this.phaseT > 1.1) { this.phase = 'wave'; this.phaseT = 0; Sound.startMusic(); if (this.run.kind !== 'tutorial') speak('Shields up, pilot.'); }
+        if (this.phaseT > 1.1) { this.phase = 'wave'; this.phaseT = 0; Sound.startMusic(); if (this.run.kind !== 'tutorial') this._radio('launch'); }
         break;
       case 'wave': {
         const live = this.threats.filter(t => !t.dying && !t.ally);
@@ -598,7 +652,8 @@ export class Game {
         if (!this.revenantWave && this.sector === 1 && this.run.revenants !== false && this.revenantQueue.length >= CONFIG.REVENANT_MIN
             && this.sectorKills >= Math.ceil(this.sectorGoal * CONFIG.REVENANT_WAVE_AT)) {
           this.revenantWave = true;
-          this.on.banner('REVENANT FLEET', 'Your past mistakes return', 'boss');
+          this.on.banner('RETURNING FRAGMENTS', 'Meteors you missed have looped back', 'boss');
+          this._radio('returning');
           Sound.bossWarn();
         }
         const revPending = this.revenantWave && this.revenantQueue.length > 0;
@@ -610,8 +665,8 @@ export class Game {
         if (this.sectorKills >= this.sectorGoal && live.length === 0 && !revPending) {
           this.phase = 'bossWarn'; this.phaseT = 0;
           Sound.bossWarn();
-          this.on.banner('WARNING', this.run.bossName ? this.run.bossName : 'Mothership inbound', 'boss');
-          if (this.run.kind !== 'tutorial') speak('Warning. Mothership inbound.');
+          this.on.banner('WARNING', this.run.bossName ? this.run.bossName : 'Planet-killer inbound', 'boss');
+          if (this.run.kind !== 'tutorial') speak('Warning. Planet-killer inbound.');
         }
         break;
       }
@@ -624,7 +679,7 @@ export class Game {
             this.phase = 'victory'; this.phaseT = 0; this.session.victory = true;
             Sound.record(); Sound.stopMusic();
             this.on.banner('MISSION COMPLETE', this.run.title, 'sector');
-          } else if (this.run.perks) this._offerPerks();
+          } else if (this.run.perks) { this._radio('waveClear'); this._offerPerks(); }
           else this._beginWarp();
         }
         break;
@@ -636,10 +691,15 @@ export class Game {
           this.session.nextSector();
           this.sectorKills = 0;
           this.director.heat *= 0.5;
-          this._repair(CONFIG.REPAIR_SECTOR_CLEAR, 'SECTOR CLEAR');
+          this._repair(CONFIG.REPAIR_SECTOR_CLEAR, 'WAVE HELD');
           this._sectorReset();
-          this.on.banner(`SECTOR ${this.sector}`, this.run.kind === 'endless' || this.run.kind === 'daily' ? this.theme.name : this.run.title, 'sector');
-          if (this.run.kind === 'endless') speak(`Sector ${this.sector}.`);
+          if (this.ammoOn) {
+            const add = this._allotment(this.sector);
+            this.ammo = Math.min(CONFIG.AMMO_CAP, this.ammo + add); this.ammoMax = this.ammo;
+            this.popups.push({ x: VIEW.W / 2, y: VIEW.impactY - 40, text: `+${add} ROUNDS`, sub: 'SUPPLY DROP', life: 2, color: '#ffd740', size: 24 });
+          }
+          this.on.banner(`WAVE ${this.sector}`, this.run.kind === 'endless' || this.run.kind === 'daily' ? this.theme.name : this.run.title, 'sector');
+          if (this.run.kind === 'endless') speak(`Wave ${this.sector}.`);
           this.on.hud(this);
         }
         if (this.phaseT > 2.8) { this.phase = 'wave'; this.phaseT = 0; this.spawnT = 0.4; }
@@ -653,6 +713,17 @@ export class Game {
         break;
     }
     if (this.phase !== 'warp') this.warp = Math.max(0, this.warp - dt * 1.5);
+
+    // Emergency feed: an empty magazine gets one round every few seconds
+    if (this.dry && active && this.phase !== 'dying') {
+      this.dryT += dt; this.session.dryTime += dt;
+      if (this.dryT >= CONFIG.EMERGENCY_FEED) {
+        this.dryT = 0; this.ammo = 1;
+        this.popups.push({ x: this.ship.x, y: this.ship.y - 80, text: '+1 EMERGENCY ROUND', life: 1, color: '#ffab40', size: 16 });
+        this.on.hud(this);
+        if (this.input && this.input !== '-') this._evaluate(false);
+      }
+    }
 
     // Carrier drone
     if (this.droneReady && this.phase === 'wave') {
@@ -682,7 +753,7 @@ export class Game {
         th.enter = Math.min(1, (th.enter || 0) + dt * 0.8);
         const ease = 1 - Math.pow(1 - th.enter, 3);
         th.x = VIEW.W / 2 + Math.sin(th.wob * 0.35) * Math.min(160, VIEW.W / 2 - 170);
-        th.y = lerp(-140, lerp(VIEW.top + 60, VIEW.impactY - 80, th.progress), ease);
+        th.y = lerp(-140, lerp(VIEW.top + 140, VIEW.impactY - 80, th.progress), ease);
         if (th.progress >= 1) this._impact(th);
       } else if (th.ally) {
         th.progress += dt * th.rate;

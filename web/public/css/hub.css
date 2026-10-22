@@ -281,6 +281,74 @@ table.skills td { padding: 6px; border-bottom: 1px solid rgba(255,255,255,.05); 
 .v-tall .perk h4 { margin: 0; }
 .v-tall .perk .p-stack { grid-column: 2; }
 
+
+/* ════════════════════════════════════════════════════════════
+   STORY — opening sequence, chapter scenes, mission briefings
+   ════════════════════════════════════════════════════════════ */
+.screen.story { justify-content: flex-end; align-items: center; background: linear-gradient(to bottom, transparent 30%, rgba(0,2,12,.55) 60%, rgba(0,2,12,.9));
+  backdrop-filter: none; padding: calc(24px + var(--safe-t)) calc(24px + var(--safe-r)) calc(28px + var(--safe-b)) calc(24px + var(--safe-l)); gap: 14px; }
+.st-top { text-align: center; }
+.st-top .kicker { margin-bottom: 6px; }
+.st-title { font: 900 40px var(--orb); letter-spacing: 6px; margin: 0; text-shadow: 0 4px 30px rgba(0,0,0,.8);
+  background: linear-gradient(90deg, #fff, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.st-panel { width: min(860px, 100%); padding: 22px 26px 16px; text-align: left; cursor: pointer; animation: tipIn .35s ease;
+  background: rgba(3,9,26,.88); border-color: rgba(0,229,255,.28); }
+.st-panel.final { cursor: default; }
+.st-panel.narrate .st-text { font-size: 20px; line-height: 1.6; color: #e8f1ff; }
+.st-text { font-size: 18px; line-height: 1.55; color: #dfe9ff; min-height: 84px; white-space: pre-line; }
+.st-who { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.st-who b { display: block; font: 700 14px var(--orb); letter-spacing: 1px; }
+.st-who span:not(.st-face) { font-size: 11px; color: rgba(255,255,255,.5); letter-spacing: 1px; }
+.st-face { flex: none; width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font: 900 14px var(--orb); color: #001018; background: radial-gradient(circle at 35% 30%, #fff, var(--c) 55%, color-mix(in srgb, var(--c) 40%, #000));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c) 50%, transparent); }
+.st-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.st-dots { display: flex; gap: 6px; }
+.st-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.15); }
+.st-dots i.done { background: rgba(0,229,255,.45); }
+.st-dots i.on { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.brief-card .b-id { font: 700 12px var(--orb); letter-spacing: 3px; color: var(--cyan); }
+.brief-card .b-name { font: 900 30px var(--orb); letter-spacing: 2px; margin: 4px 0 6px; }
+.brief-card p { color: rgba(255,255,255,.65); font-size: 15px; }
+.b-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 10px; }
+.b-grid div { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 8px 12px; }
+.b-grid span { display: block; font: 700 10px var(--orb); letter-spacing: 2px; color: rgba(255,255,255,.45); }
+.b-grid b { font: 700 16px var(--orb); color: var(--gold); }
+.b-threats { display: flex; gap: 6px; flex-wrap: wrap; }
+.b-note { margin-top: 10px; font-size: 12px; color: #ffd180; }
+
+/* ── Radio chatter (in-run) ── */
+#radio { position: absolute; left: calc(22px + var(--safe-l)); top: calc(150px + var(--safe-t)); z-index: 9; max-width: 420px;
+  display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; border-radius: 30px 12px 12px 30px; pointer-events: none;
+  background: rgba(2,10,26,.86); border: 1px solid rgba(0,229,255,.25); animation: radioIn .3s ease; }
+#radio .st-face { width: 38px; height: 38px; font-size: 12px; }
+#radio b { font: 700 11px var(--orb); letter-spacing: 1px; }
+#radio p { font-size: 14px; line-height: 1.35; color: #e3eeff; }
+@keyframes radioIn { from { opacity: 0; transform: translateX(-16px); } }
+.v-narrow #radio { top: calc(178px + var(--safe-t)); left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r)); max-width: none; }
+
+/* ── Deck additions ── */
+.pill.day { color: #ffab40; border-color: rgba(255,171,64,.4); letter-spacing: 2px; }
+.tile.earth { background: linear-gradient(160deg, rgba(41,121,255,.16), rgba(6,14,36,.85)); }
+.city-meter { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin: 8px 0 2px; }
+.city-meter i { display: block; height: 100%; background: linear-gradient(90deg, #ffb74d, #ffe082); }
+.sys-kicker { font: 700 10px var(--orb); letter-spacing: 3px; color: rgba(255,255,255,.5); margin-bottom: 4px; }
+.sys-panel .replay { align-self: flex-start; margin: 0 0 12px; }
+.mission .mcity { color: #ffcc80; }
+.ccard .intel { font-size: 12px; font-style: italic; color: #90caf9; margin-bottom: 6px; line-height: 1.45; }
+.db-radio { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 4px auto 2px; font-size: 14px; text-align: left; color: rgba(255,255,255,.8); }
+.db-radio .st-face { width: 32px; height: 32px; font-size: 10px; }
+.db-stats b.good { color: var(--green); }
+.db-stats b.bad { color: #ff8a80; }
+
+/* Story on compact screens */
+.v-compact .st-title { font-size: 28px; letter-spacing: 3px; }
+.v-compact .st-panel { padding: 16px 16px 12px; }
+.v-compact .st-text, .v-compact .st-panel.narrate .st-text { font-size: 16px; }
+.v-compact .b-grid { grid-template-columns: 1fr 1fr; }
+.v-compact .brief-card .b-name { font-size: 24px; }
+.v-narrow:not(.v-compact) .b-grid { grid-template-columns: 1fr 1fr; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes perkIn { from { opacity: 0; transform: translateY(30px) scale(.9); } }
 @keyframes tipIn { from { opacity: 0; transform: translateY(8px); } }

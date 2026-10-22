@@ -125,7 +125,7 @@ export class Director {
   bossName(level) {
     if (this.run.bossName) return this.run.bossName;
     const weak = this.weakestFn(this.bossPool(level).filter(id => !MEMORY_SKILL_IDS.includes(id)), 1)[0];
-    return weak ? `The ${SKILL_LABELS[weak]} Dreadnought` : 'The Dreadnought';
+    return weak ? `Planet-killer · ${SKILL_LABELS[weak]}` : 'Planet-killer';
   }
 
   bossChallenge(level) {

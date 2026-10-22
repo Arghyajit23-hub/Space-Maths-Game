@@ -4,6 +4,48 @@ This is the single source of truth for how the game fits together. Every number 
 
 ---
 
+## 0. Story: "The Swarm" (Earth, 2047) [`data/story.js`, `ui/story.js`]
+
+Year 2047. A meteor swarm detected by the lunar far-side observatories falls on Earth in waves over months. Automated defenses can't cope, so the world relies on the **Interceptors**. The war outlasts the supplies: every round is precious, and a wrong answer wastes a city's worth of ammunition.
+
+| Game system | Story name |
+|---|---|
+| Galaxy map, 6 systems | **Defense Map**, 6 chapters: First Light · The Shattering · Blackout · Heavy Iron · Decoys · Heart of the Swarm |
+| Sector | Wave |
+| Mothership / Dreadnought | **Planet-killer** (Titan-1, The Splinter, The Ghost Rock, Atlas Mass, The Twin, The Heart of the Swarm) |
+| rock / saucer / splitter / swarm | Stony / iron / fracturing meteor / debris cluster |
+| cloaked / beacon / shield / mirror | Dark meteor / tracking ping / ice-crusted meteor / twin track |
+| ally / revenant | Supply shuttle (never fire) / returning fragment |
+| Perk draft | Supply drop |
+| Codex | Intel files (story fragment + maths trick) |
+| Deep Space / Daily Galaxy | The Long Watch / Today's Wave |
+
+**Cast:** Commander Aisha Rao (Interceptor Command, briefings), Dr. Kenji Mori (Far Side Observatory, intel), Lina "Spark" Okoye (rookie gunner, your wing).
+
+**Story beats** (stored in `profile.seen`):
+- Opening sequence (7 panels) on first enlist; existing pilots see it once on their next visit. Replay from Settings or Intel Files.
+- Chapter opening before the first mission of each chapter; chapter ending after its planet-killer first falls (6-1 plays the finale). Replay from the Defense Map.
+- Mission briefing card before every story launch: defended city, waves, munitions, threats. Retry from the debrief skips it.
+- In-run radio chatter for key moments (`RADIO` events: launch, cluster, fracture, shuttle, ammoLow, dry, wasted, boss, bossHalf, hullCrit, streak, waveClear, returning, impact).
+- Each mission defends a city (`CITIES`); the deck shows **Day N of the Swarm** and **Earth status** (cities protected).
+
+### Munitions [`config.js`, `game.js › _spend / _allotment`]
+| Rule | Value |
+|---|---|
+| Rounds per wave | ⌈(wave kills + planet-killer HP) × 1.5⌉ + 4 (+8 with Munitions Factory) |
+| Correct answer | −1 round (a debris cluster costs 1 for all three) |
+| BLAZING answer | round recovered (+1) |
+| Wrong answer / friendly fire | −1 round wasted (not with Recycler) |
+| Echo, Chain Lightning, Carrier drone | free |
+| Empty magazine | answer is held; emergency feed gives 1 round every 2.5 s, so a run can't soft-lock |
+| Supply drop between waves | + next wave's allotment, leftovers carry over (cap 99) |
+| Off | Flight School, Assist mode |
+| ★★★ | 85% accuracy + zero impacts + magazine never ran dry |
+
+Debrief shows rounds fired, munitions efficiency (non-wasted ÷ fired), rounds wasted/recovered.
+
+---
+
 ## 1. Player journey (top level)
 
 ```mermaid

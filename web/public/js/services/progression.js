@@ -50,7 +50,7 @@ export const Progress = {
 
   starsFor(summary) {
     if (!summary.victory) return 0;
-    if (summary.accuracy >= 85 && summary.impacts === 0) return 3;
+    if (summary.accuracy >= 85 && summary.impacts === 0 && !summary.ranDry) return 3;
     if (summary.accuracy >= 85) return 2;
     return 1;
   },
