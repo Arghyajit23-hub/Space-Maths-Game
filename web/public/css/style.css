@@ -126,11 +126,6 @@ h1 { font-family: var(--orb); font-size: 76px; font-weight: 900; letter-spacing:
   -webkit-background-clip: text; background-clip: text; color: transparent; animation: hue 6s ease infinite; }
 h2 { font-family: var(--orb); font-size: 40px; letter-spacing: 6px; margin-bottom: 26px; }
 .tagline { font-family: var(--orb); font-size: 14px; letter-spacing: 5px; color: rgba(255,255,255,.55); margin: 4px 0 26px; }
-#nameInput { width: 320px; max-width: calc(100% - 40px); padding: 14px; margin-bottom: 14px; border-radius: 10px; text-align: center;
-  font: 700 18px var(--orb); letter-spacing: 3px; color: var(--cyan); background: rgba(0,229,255,.05);
-  border: 1.5px solid rgba(0,229,255,.3); outline: none; -webkit-user-select: text; user-select: text; }
-#nameInput:focus { border-color: var(--violet); box-shadow: 0 0 24px rgba(124,77,255,.3); }
-#nameInput::placeholder { color: rgba(0,229,255,.3); }
 .btn { font: 900 18px var(--orb); letter-spacing: 4px; padding: 15px 44px; border-radius: 10px; cursor: pointer;
   border: none; margin: 6px; transition: transform .1s, box-shadow .2s; color: #fff; }
 .btn:hover { transform: translateY(-2px); }

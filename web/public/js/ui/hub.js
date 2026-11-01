@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════
-//  HUB SCREENS — Welcome, Command Deck, Defense Map, Hangar, Brain Map,
+//  HUB SCREENS — Command Deck, Defense Map, Hangar, Brain Map,
 //  Intel Files, Records, Settings, Parent Zone. (FLOWMAP §1, §4, §7–11)
 //  Each render function fills its <section> and wires its buttons to
 //  the `app` controller passed in from main.js.
@@ -23,30 +23,6 @@ import { CHAPTERS, CITIES, swarmDay, citiesProtected } from '../data/story.js';
 
 const P = () => Profile.get();
 const DPR = () => Math.min(devicePixelRatio || 1, 2);
-
-// ── Welcome ────────────────────────────────────────
-export function renderWelcome(app) {
-  const el = $('welcomeScreen');
-  el.innerHTML = `
-    <div class="kicker">EARTH · YEAR 2047</div>
-    <h1>SPACE MATH</h1>
-    <div class="tagline">Every answer is a round. Make it count.</div>
-    <p class="intro">A meteor swarm is falling on Earth in waves, and the munitions factories can't keep up.
-      Join the Interceptors: solve, remember and reason faster than the rocks can reach the line.</p>
-    <input id="nameInput" type="text" placeholder="INTERCEPTOR CALLSIGN" maxlength="16" autocomplete="off" spellcheck="false">
-    <button id="btnBegin" class="btn primary">ENLIST <kbd>Enter</kbd></button>
-    <div class="keys">The story takes a minute, then Flight School. You can change your callsign later.</div>`;
-  const input = $('nameInput');
-  const go = () => {
-    const name = input.value.trim().slice(0, 16);
-    if (!name) { input.focus(); toast('Choose a callsign first, pilot.'); return; }
-    Profile.update(p => { p.name = name; });
-    app.launch('1-0');
-  };
-  $('btnBegin').onclick = go;
-  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
-  setTimeout(() => input.focus(), 50);
-}
 
 // ── Command Deck ───────────────────────────────────
 function pilotBar() {
@@ -326,7 +302,7 @@ export function renderCodex(app) {
       const has = p.codex.includes(c.id);
       return `<div class="ccard glass ${has ? '' : 'locked'}"><h4>${has ? esc(c.title) : '▮▮▮▮▮▮▮'}</h4>${has && c.intel ? `<div class="intel">${esc(c.intel)}</div>` : ''}<p>${has ? esc(c.body) : `Unlock by: ${esc(c.from)}`}</p></div>`;
     }).join('')}</div>`;
-  $('btnReplayIntro').onclick = () => app.intro(() => app.go('codex'));
+  $('btnReplayIntro').onclick = () => app.intro(() => app.go('codex'), { full: true });
   wire($('codexScreen'), app);
 }
 
@@ -379,6 +355,7 @@ export function renderSettings(app) {
       ${row('reducedMotion', 'Reduced motion', 'No screen shake, softer flashes.')}
       ${row('assist', 'Assist mode', '+30% time on every meteor and unlimited munitions. Great for learning. Assist runs are not ranked.')}
       <div class="setting glass"><div><h4>Story</h4><p>Watch the opening of The Swarm again.</p></div><button class="btn ghost small" id="btnStory">▶ REPLAY OPENING</button></div>
+      <div class="setting glass"><div><h4>Pilot</h4><p>Playing as <b>${esc(P().name)}</b>. Each name keeps its own progress on this device.</p></div><button class="btn ghost small" id="btnSwitch">⇄ SWITCH PILOT</button></div>
       <div class="setting glass"><div><h4>Callsign</h4><p>Shown on leaderboards. Offensive names are replaced automatically.</p></div>
         <div class="field" style="margin:0;min-width:360px"><input id="renameInput" maxlength="16" value="${esc(P().name)}"><button class="btn primary small" id="btnRename">SAVE</button></div></div>
     </div>`;
@@ -387,11 +364,13 @@ export function renderSettings(app) {
     Profile.update(p => { p.settings[b.dataset.set] = !p.settings[b.dataset.set]; });
     app.applySettings(); renderSettings(app);
   });
-  $('btnStory').onclick = () => app.intro(() => app.go('settings'));
+  $('btnStory').onclick = () => app.intro(() => app.go('settings'), { full: true });
+  $('btnSwitch').onclick = () => app.reboot();
   $('btnRename').onclick = () => {
     const n = $('renameInput').value.trim().slice(0, 16);
     if (!n) return toast('Callsign cannot be empty.');
-    Profile.update(p => { p.name = n; }); toast('Callsign saved.');
+    if (!Profile.rename(n)) return toast('Another pilot on this device already uses that name.');
+    toast('Callsign saved.');
   };
   wire(root, app);
 }

@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════
 //  STORY — "The Swarm" (Earth, 2047).
-//  Opening sequence, cast, chapters (one per Defense Map zone),
+//  Opening ("The Dreaming Mind"), cast, chapters (one per Defense Map zone),
 //  mission briefings, chapter endings and in-run radio chatter.
 //  Pure data: rendered by ui/story.js, triggered from main.js.
 //  A line is { who?: castId, text } — `{name}` becomes the callsign.
@@ -11,25 +11,78 @@ export const CAST = {
   mori:  { name: 'Dr. Kenji Mori', role: 'Far Side Observatory, Moon', glyph: 'KM', color: '#00e5ff' },
   spark: { name: 'Lina "Spark" Okoye', role: 'Rookie gunner, your wing', glyph: 'SP', color: '#ff4081' },
   you:   { name: 'You', role: 'Interceptor', glyph: '▲', color: '#69f0ae' },
+  vyom:  { name: 'Vyom', role: 'Architect of the Interceptor program', glyph: '◈', color: '#e8a87c' },
 };
 
-// ── Opening sequence (the user's story, panel by panel) ──
-export const INTRO = [
-  { art: 'earth', kicker: 'YEAR 2047',
-    text: 'Earth was sprinting toward the peak of its technological age. Fusion grids lit the cities, autonomous fleets crossed the skies, and humanity believed the age of existential threats was behind it.' },
-  { art: 'moon', kicker: 'LUNAR FAR SIDE OBSERVATORY',
-    text: 'Then the observatories on the lunar far side picked up something nobody had planned for: a swarm of meteors on a collision course with Earth, arriving in waves over months rather than in a single strike.' },
-  { art: 'swarm', kicker: 'THE SWARM',
-    text: 'Technology alone couldn’t stop them. Satellites were too few and automated defenses too slow, and the swarm was too unpredictable for any algorithm to handle without a human making the final call.' },
-  { art: 'fleet', kicker: 'THE INTERCEPTORS',
-    text: 'So the world turned to its Interceptors, an elite corps of pilots and gunners trained to meet the rocks in orbit and the upper atmosphere. They held the line wave after wave.' },
-  { art: 'supply', kicker: 'THE SHORTAGE',
-    text: 'But the fight outlasted the supplies. Munitions factories couldn’t keep pace, rare-earth stockpiles ran low, and every launch cost something that could not be replaced.' },
-  { art: 'earth', kicker: 'NOW',
-    text: 'Now the question wasn’t whether they could fight, but how to spend what little they had left. Every meteor demanded a different answer, and every wrong choice meant a city’s worth of ammunition wasted on the wrong target.' },
-  { art: 'fleet', who: 'rao', kicker: 'INTERCEPTOR COMMAND',
-    text: 'Welcome to the Interceptors, {name}. Your gun fires the moment you type the right answer. Spend every round like it’s the last one we have. It might be.' },
+// ── Opening: "The Dreaming Mind" (ui/dream.js) ──
+// The player wakes from cryosleep inside their own rebuilding mind while
+// Vyom, the architect of the Interceptor program, talks them back online.
+// `phase` changes what the dreamspace shows; `fx` fires a one-off effect.
+export const DREAM = [
+  { who: 'vyom', phase: 1, fx: 'flicker', text: '{name}. If you can hear this, hold onto my voice. Don’t try to remember yet. Just listen.' },
+  { who: 'you', text: '…I can’t see anything.' },
+  { who: 'vyom', fx: 'threads', text: 'That’s normal. Your visual cortex is rebuilding. The cryosleep was longer than we planned. Much longer.' },
+  { who: 'you', text: 'Am I dead?' },
+  { who: 'vyom', text: 'No. Though I imagine the difference feels academic right now.' },
+  { who: 'you', phase: 2, text: 'Vyom…? That’s… I know that voice.' },
+  { who: 'vyom', fx: 'symbols', text: 'Good. Your memory architecture is re-integrating. You were the fastest mental-math pilot in the Interceptor program. I need that mind intact. All of it.' },
+  { who: 'you', text: 'What year is it?' },
+  { who: 'vyom', text: '2047. You’ve been under for seven years. I’m sorry — I wouldn’t have woken you if we had any other option. And we have no other option.' },
+  { who: 'vyom', phase: 3, text: 'A meteor swarm. Massive. Coming in waves. The automated defense grid — everything I built — is offline. Electromagnetic pulse from the first wave fried it all.' },
+  { who: 'you', text: 'The targeting AI…?' },
+  { who: 'vyom', fx: 'cities', text: 'Gone. Every automated system. And munitions are critically low. Every single shot has to land.' },
+  { who: 'vyom', text: 'Twenty-one cities, {name}. Fourteen million people in each, on average. The targeting computer will feed you trajectory data as equations. You solve them. The cannon fires. That’s all that’s left.' },
+  { who: 'vyom', phase: 4, text: 'But first — I need to know your mind came back whole. The cryosleep can cause cognitive drift. I’m going to send you a trajectory equation. Solve it. Prove to me you’re still you.' },
 ];
+export const DREAM_TEST = {
+  right: '…there you are. Welcome back, Interceptor.',
+  wrong: 'Try again. Take your time. The swarm isn’t here yet — but it’s close.',
+};
+
+// ── Vyom between waves (supply drop). Picked by wave number and how the
+//    wave went: heavy damage > that exact wave (if not heard yet) > perfect wave > wave stage. ──
+export const VYOM_LINES = [
+  { id: 'w1a', wave: 1, text: 'Wave held. All 21 cities intact. Don’t get comfortable — that was the smallest one.' },
+  { id: 'w1b', wave: 1, text: 'First wave down. Your hands remembered before your head did. That’s what training is for.' },
+  { id: 'w3', wave: 3, text: 'You’re faster than I remember, {name}. Or maybe I just forgot what hope feels like.' },
+  { id: 'w5', wave: 5, text: 'I haven’t slept in four days. But I’m not leaving this channel. Not while you’re up there.' },
+  { id: 'd1', when: 'damage', text: 'That was too close. I can hear the hull groaning from here. Be precise, {name}. Please.' },
+  { id: 'd2', when: 'damage', text: 'Your hull is taking it hard. Slow is smooth, and smooth is fast. Breathe before you fire.' },
+  { id: 'd3', when: 'damage', text: 'I’ve rerouted what power I have left into your shielding. It isn’t much. Don’t make me use all of it.' },
+  { id: 'p1', when: 'perfect', text: '…every shot landed. I designed this program hoping someone like you would exist. I wasn’t wrong.' },
+  { id: 'p2', when: 'perfect', text: 'Not one round wasted. I checked the numbers twice. Then a third time, just to enjoy it.' },
+  { id: 'p3', when: 'perfect', text: 'A clean wave. Somewhere down there, a city will never know how close it came.' },
+  { id: 'e1', stage: 'early', text: 'The swarm is changing its spread. So should you. Take whatever helps you most.' },
+  { id: 'e2', stage: 'early', text: 'Supply drop inbound. I packed it myself. Well — I wrote the code that packed it.' },
+  { id: 'm1', stage: 'mid', text: 'The cities are dark down there, {name}, but they’re awake. They’re watching your contrails.' },
+  { id: 'm2', stage: 'mid', text: 'My tea went cold an hour ago. I only just noticed. That’s how well this is going.' },
+  { id: 'm3', stage: 'mid', text: 'Your trajectory solutions are cleaner than mine ever were. Don’t tell anyone I said that.' },
+  { id: 'l1', stage: 'late', text: 'Every wave you hold is one I didn’t think we’d survive. Keep proving me wrong.' },
+  { id: 'l2', stage: 'late', text: 'The grid I built took eleven years. You’re doing its job with a keypad. Remarkable.' },
+  { id: 'l3', stage: 'late', text: 'Still here. Still watching. Still counting on you, {name}.' },
+];
+
+/**
+ * Pick Vyom's supply-drop line. stats = { wave, hullLost, hullMax, hull, misses }.
+ * `heard` = ids heard recently (the least recently heard line wins ties).
+ */
+export function pickVyomLine(stats, heard = []) {
+  const { wave, hullLost = 0, hullMax = 100, hull = 100, misses = 0 } = stats;
+  const stage = wave <= 2 ? 'early' : wave <= 7 ? 'mid' : 'late';
+  const pools = [];
+  if (hullLost >= hullMax * 0.3 || hull <= hullMax * 0.3) pools.push(VYOM_LINES.filter(l => l.when === 'damage'));
+  pools.push(VYOM_LINES.filter(l => l.wave === wave && !heard.includes(l.id)));
+  if (misses === 0 && hullLost === 0) pools.push(VYOM_LINES.filter(l => l.when === 'perfect'));
+  pools.push(VYOM_LINES.filter(l => l.stage === stage));
+  for (const pool of pools) {
+    if (!pool.length) continue;
+    const fresh = pool.filter(l => !heard.includes(l.id));
+    if (fresh.length) return fresh[Math.floor(Math.random() * fresh.length)];
+    // Everything heard: replay the one heard longest ago
+    return pool.slice().sort((a, b) => heard.indexOf(a.id) - heard.indexOf(b.id))[0];
+  }
+  return VYOM_LINES[0];
+}
 
 // ── Chapters: one per Defense Map zone (system id) ──
 export const CHAPTERS = {

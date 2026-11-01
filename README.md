@@ -1,11 +1,14 @@
 # Space Math
 
-**Think fast. Survive longer.** A competitive space survival game for students. Asteroids, Splitter crystals, Beacons and Dreadnoughts dive at your ship, and your mental maths, memory and logic are the only weapons. You explore a six-system galaxy, draft roguelite perks, beat your own Revenants, take on the Daily Galaxy, and climb the leaderboards with your class fleet.
+**Earth, 2047. Every answer is a round.** A story-driven maths survival game for students aged 10–14. A meteor swarm is falling on Earth in waves and the munitions factories can't keep up. As an Interceptor, your mental maths, memory and logic are the only weapons, and every wrong answer wastes ammunition the planet can't replace.
+
+It opens like a film: you wake from seven years of cryosleep in pod 07·114, talked back to consciousness by **Vyom**, the architect of the Interceptor program, who stays with you for the rest of the war. Then fly six story chapters on the Defense Map, defend 20 cities, break planet-killers, pick supply-drop upgrades, clear returning fragments (your past mistakes), take on Today's Wave and climb the leaderboards with your class fleet. Several pilots can share one device: every visit starts with *WHO ARE YOU?*, and each name keeps its own progress. The game adapts to any screen, from a phone held upright to an ultrawide monitor.
 
 - **Play locally:** `npm start`, then open http://localhost:3000 (Node.js 18+, no install step)
 - **Test:** `npm test`
-- **Design:** [docs/FLOWMAP.md](docs/FLOWMAP.md) is the master flowmap with every system and number
+- **Design & story:** [docs/FLOWMAP.md](docs/FLOWMAP.md) is the master flowmap: story, munitions, every system and number
 - **Run, deploy, extend:** [web/README.md](web/README.md)
+- **Live:** deployed on Render from the `main` branch (auto-deploy on push)
 
 ---
 

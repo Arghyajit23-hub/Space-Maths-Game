@@ -11,9 +11,10 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <title>Space Math — Earth, 2047</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Manrope:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/hub.css">
+  <link rel="stylesheet" href="css/dream.css">
 </head>
 <body>
 
@@ -35,6 +36,7 @@
         <div id="hudPerks" class="perk-chips"></div>
       </div>
       <div class="hud-center">
+        <div id="hudCall" class="hud-call"></div>
         <div id="hudSector" class="sector-name">WAVE 1</div>
         <div class="sector-bar"><div id="hudSectorFill"></div></div>
         <div id="hudSectorHint" class="sector-hint"></div>
@@ -73,6 +75,7 @@
 
     <!-- Perk draft -->
     <section id="draftScreen" class="screen draft hidden">
+      <div id="vyomTx" class="vyom-tx hidden"></div>
       <div class="kicker">WAVE HELD · SUPPLY DROP · CHOOSE ONE</div>
       <div id="draftCards" class="draft-cards"></div>
       <div class="keys">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> or click</div>
@@ -82,7 +85,8 @@
     <button id="btnPause" class="icon-btn hidden" title="Pause (Esc)">❚❚</button>
 
     <!-- ══ SCREENS (content rendered by js/ui/*) ══ -->
-    <section id="welcomeScreen" class="screen hidden"></section>
+    <section id="dreamScreen" class="screen dream hidden"></section>
+    <section id="cinemaScreen" class="screen cinema hidden"></section>
     <section id="storyScreen" class="screen story hidden"></section>
     <section id="deckScreen" class="screen hub hidden"></section>
     <section id="galaxyScreen" class="screen hub hidden"></section>

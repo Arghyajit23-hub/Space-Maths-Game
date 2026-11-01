@@ -13,8 +13,10 @@ import { Profile } from './services/profile.js';
 import { Progress } from './services/progression.js';
 import { Leaderboard } from './services/leaderboard.js';
 import { endlessRun, dailyRun, missionRun, MISSION, SYSTEMS, missionsOf } from './data/galaxy.js';
-import { INTRO, CHAPTERS, BRIEFINGS, CITIES, RADIO, CAST, fill } from './data/story.js';
+import { CHAPTERS, BRIEFINGS, CITIES, RADIO, CAST, fill, pickVyomLine } from './data/story.js';
 import { playScene, storyKey, storyArt, storyActive, setStoryReducedMotion } from './ui/story.js';
+import { playDream, dreamKey, dreamPad, renderDream, renderShatter, dreamActive, setDreamReducedMotion, vyomIcon } from './ui/dream.js';
+import { playCinema, renderCinema, cinemaKey, setCinemaReducedMotion } from './ui/cinema.js';
 import { PERK } from './data/perks.js';
 import { TRAIL } from './data/ships.js';
 import { ACHIEVEMENTS } from './data/achievements.js';
@@ -85,7 +87,7 @@ if (new URLSearchParams(location.search).has('debug')) window.__game = game; // 
 // ════════════════════════════════════════════
 //  Router
 // ════════════════════════════════════════════
-let ui = 'menu';          // menu | story | play | paused | draft | debrief
+let ui = 'menu';          // menu | dream | cinema | story | play | paused | draft | debrief
 let screen = null;        // current hub screen
 let currentRun = null;
 let overAt = 0;
@@ -105,7 +107,7 @@ const app = {
     game.state = 'idle';
     setPlayChrome(false);
     if (name !== 'parent') Hub.closeParentGate();
-    const r = { welcome: Hub.renderWelcome, deck: Hub.renderDeck, galaxy: Hub.renderGalaxy, hangar: Hub.renderHangar, brain: Hub.renderBrain,
+    const r = { deck: Hub.renderDeck, galaxy: Hub.renderGalaxy, hangar: Hub.renderHangar, brain: Hub.renderBrain,
       codex: Hub.renderCodex, records: Hub.renderRecords, settings: Hub.renderSettings, parent: Hub.renderParent }[name];
     r(app);
     showScreen(name);
@@ -120,7 +122,7 @@ const app = {
   sound(name, arg) { Sound[name]?.(arg); },
   applySettings() {
     const s = Profile.get().settings;
-    Sound.setEnabled(s.sound); Sound.setVoice(s.voice); setReducedMotion(s.reducedMotion); setStoryReducedMotion(s.reducedMotion);
+    Sound.setEnabled(s.sound); Sound.setVoice(s.voice); setReducedMotion(s.reducedMotion); setStoryReducedMotion(s.reducedMotion); setDreamReducedMotion(s.reducedMotion); setCinemaReducedMotion(s.reducedMotion);
     $('btnSound').classList.toggle('off', !s.sound); $('btnSound').textContent = s.sound ? '♫' : '✕';
   },
   checkAchievements() {
@@ -130,16 +132,43 @@ const app = {
       try { if (a.test({}, p)) { Profile.update(pp => { pp.achievements.push(a.id); pp.credits += a.reward; }); toast(`🏅 ${a.name} · +¤${a.reward}`); } } catch {}
     }
   },
+  /**
+   * Every visit starts in the Void: "WHO ARE YOU?". The name picks the pilot
+   * (each name has its own save). New pilots get the whole dream, Vyom's test
+   * and Flight School; returning pilots wake straight onto the Command Deck.
+   */
   reboot() {
-    if (Profile.isNew()) return app.go('welcome');
-    // Pilots from before the story update see the opening once
-    if (!Profile.get().seen.intro) return app.intro(() => app.go('deck'));
-    app.go('deck');
+    app.intro(() => (Profile.get().missions['1-0']?.cleared ? app.go('deck') : startRun('1-0', { awaken: true })), { boot: true });
   },
-  /** Opening sequence (first launch, or replayed from Settings / Intel Files). */
-  intro(then) {
-    Profile.update(p => { p.seen.intro = true; });
-    story({ kicker: 'THE SWARM', lines: INTRO, onDone: then });
+  /**
+   * "The Dreaming Mind" opening. boot = the start of a visit (empty name field,
+   * saved pilots offered); full = always play the conversation (replays).
+   */
+  intro(then, { boot = false, full = !boot } = {}) {
+    ui = 'dream'; screen = null;
+    game.state = 'idle';
+    Sound.stopMusic();
+    setPlayChrome(false);
+    let film = false;   // the whole story plays: cold open before the talk, the pod waking after the test
+    const cinema = (kind, done) => { ui = 'cinema'; showScreen('cinema'); playCinema(kind, { name: Profile.get().name }, done); };
+    playDream({
+      name: boot ? '' : Profile.get().name,
+      pilots: Profile.pilots().map(p => p.name),
+      test: true,
+      onName: name => {
+        const { isNew } = Profile.switchTo(name);
+        app.applySettings();
+        const returning = !full && !isNew && !!Profile.get().seen.intro;
+        film = !returning;
+        return { returning };
+      },
+      interlude: resume => cinema('open', () => { ui = 'dream'; showScreen('dream'); resume(); }),
+      onDone: () => {
+        Profile.update(p => { p.seen.intro = true; });
+        film ? cinema('wake', then) : then();
+      },
+    });
+    showScreen('dream');
   },
   /** Replay a chapter's opening (and its ending, once earned). */
   chapter(sysId) {
@@ -165,7 +194,7 @@ function brief(id) {
   const m = MISSION[id];
   if (!m) return startRun(id);
   const p = Profile.get();
-  if (!p.seen.intro) return app.intro(() => brief(id));
+  if (!p.seen.intro) return app.intro(() => brief(id), { full: true });
   const ch = CHAPTERS[m.system];
   const openKey = `open_${m.system}`;
   const chapterLines = ch && !p.seen[openKey] && m.kind !== 'tutorial' ? ch.open.map(l => ({ ...l, art: ch.art })) : [];
@@ -210,8 +239,8 @@ function buildRun(id) {
   return missionRun(id);
 }
 
-async function startRun(id) {
-  Sound.unlock(); Sound.click();
+async function startRun(id, { awaken = false } = {}) {
+  Sound.unlock(); if (!awaken) Sound.click();
   showScreen(null);
   const p = Profile.get();
   const run = buildRun(id);
@@ -227,10 +256,27 @@ async function startRun(id) {
   });
   ui = 'play'; screen = null;
   showScreen(null);
+  $('hudCall').innerHTML = `${vyomIcon()}<span>INTERCEPTOR: <b>${esc(p.name)}</b></span>`;
   setPlayChrome(true);
+  waveStart = waveSnapshot();
+  if (awaken) assembleHud();
   note(isTouch ? 'tap the answer · FIRE' : 'type the answer — no Enter needed');
   if (run.kind === 'endless') board = await Leaderboard.fetch('endless');
   else if (run.kind === 'daily') board = await Leaderboard.fetch('daily', { day: run.day });
+}
+
+/** The HUD lands piece by piece out of the shattering dream (dream.css). */
+function assembleHud() {
+  const parts = [$('hud'), $('console'), $('numpad')];
+  parts.forEach(e => { e.classList.remove('assemble'); void e.offsetWidth; e.classList.add('assemble'); });
+  setTimeout(() => parts.forEach(e => e.classList.remove('assemble')), 2600);
+}
+
+// Per-wave performance, for Vyom's supply-drop line
+let waveStart = null;
+function waveSnapshot() {
+  const s = game.session;
+  return { hull: game.hull, misses: s.wrong + s.timeouts + s.impacts + s.friendlyFire };
 }
 
 function abandon() {
@@ -374,8 +420,9 @@ game.on.radio = key => {
 };
 
 game.on.draft = offer => {
-  if (!offer) { ui = 'play'; showScreen(null); setPlayChrome(true); return; }
+  if (!offer) { ui = 'play'; showScreen(null); setPlayChrome(true); waveStart = waveSnapshot(); return; }
   ui = 'draft';
+  vyomSpeaks();
   const owned = game.session.perks;
   $('draftCards').innerHTML = offer.map((p, i) => {
     const n = owned.filter(x => x === p.id).length;
@@ -385,6 +432,20 @@ game.on.draft = offer => {
   setPlayChrome(false);
   showScreen('draft');
 };
+/** Vyom between waves: one line, chosen by wave number and how the wave went. */
+function vyomSpeaks() {
+  const now = waveSnapshot(), start = waveStart || now;
+  const heard = Profile.get().seen.vyomHeard || [];
+  const line = pickVyomLine({ wave: game.sector, hull: game.hull, hullMax: game.mods.hullMax,
+    hullLost: Math.max(0, Math.round(start.hull - now.hull)), misses: now.misses - start.misses }, heard);
+  Profile.update(p => { p.seen.vyomHeard = [...heard.filter(id => id !== line.id), line.id].slice(-12); });
+  const tx = $('vyomTx');
+  tx.innerHTML = `${vyomIcon('big talk')}<div><div class="who">Vyom</div><p>${esc(fill(line.text, Profile.get().name))}</p></div>`;
+  tx.classList.remove('hidden');
+  tx.style.animation = 'none'; void tx.offsetWidth; tx.style.animation = '';
+  Sound.crackle();
+}
+
 function pickPerk(i) { if (ui === 'draft') game.choosePerk(i); }
 
 game.on.over = async (summary, session) => {
@@ -456,8 +517,10 @@ const DECK_KEYS = { d: () => app.action('daily'), e: () => app.action('endless')
 document.addEventListener('keydown', e => {
   const k = e.key;
   const typing = e.target.tagName === 'INPUT';
-  if ((k === 'm' || k === 'M') && !typing) { toggleSound(); return; }
+  if ((k === 'm' || k === 'M') && !typing && !(ui === 'dream' && dreamActive())) { toggleSound(); return; }
   if (ui === 'story') { storyKey(e); return; }
+  if (ui === 'dream') { dreamKey(e); return; }
+  if (ui === 'cinema') { cinemaKey(e); return; }
 
   if (ui === 'play') {
     if (k === 'Escape' || k === 'p' || k === 'P') { e.preventDefault(); pauseRun(); return; }
@@ -482,7 +545,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   // Escape always leaves a hub screen, even while a text box (parent gate, callsign, fleet code) has focus
-  if (k === 'Escape' && screen && screen !== 'welcome' && screen !== 'deck') { e.preventDefault(); e.target.blur?.(); app.go('deck'); return; }
+  if (k === 'Escape' && screen && screen !== 'deck') { e.preventDefault(); e.target.blur?.(); app.go('deck'); return; }
   if (typing) return;
   if (screen === 'deck') {
     if (k === 'Enter') { e.preventDefault(); app.action('continue'); return; }
@@ -495,6 +558,7 @@ $('numpad').addEventListener('pointerdown', e => {
   const b = e.target.closest('button'); if (!b) return;
   e.preventDefault();
   const k = b.dataset.k;
+  if (ui === 'dream') return dreamPad(k);
   if (k === 'enter') game.submit(); else if (k === 'del') game.backspace(); else game.type(k);
 });
 
@@ -532,9 +596,12 @@ function frame(now) {
       }
     }
   }
-  if (ui === 'story') renderStoryArt(ctx, game, now, storyArt());
+  if (ui === 'dream' && dreamActive()) renderDream(ctx, now);
+  else if (ui === 'cinema') renderCinema(ctx, now);
+  else if (ui === 'story') renderStoryArt(ctx, game, now, storyArt());
   else if (ui === 'menu') renderBackdrop(ctx, game, now);
   else renderGame(ctx, game, now);
+  renderShatter(ctx, now);
   requestAnimationFrame(frame);
 }
 
