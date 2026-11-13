@@ -7,7 +7,7 @@ import { CONFIG, VIEW, computeView, multiplierProgress, THREAT_INFO } from './co
 import { fmt, clock, esc } from './core/util.js';
 import { dayKey } from './core/rng.js';
 import { Game } from './game/game.js';
-import { renderGame, renderBackdrop, renderStoryArt, setReducedMotion, plateText, MULT_COLORS } from './game/render.js';
+import { renderGame, renderBackdrop, renderStoryArt, setReducedMotion, plateText, MULT_COLORS, setPilot } from './game/render.js';
 import { Sound, speak } from './services/audio.js';
 import { Profile } from './services/profile.js';
 import { Progress } from './services/progression.js';
@@ -17,6 +17,11 @@ import { CHAPTERS, BRIEFINGS, CITIES, RADIO, CAST, fill, pickVyomLine } from './
 import { playScene, storyKey, storyArt, storyActive, setStoryReducedMotion } from './ui/story.js';
 import { playDream, dreamKey, dreamPad, renderDream, renderShatter, dreamActive, setDreamReducedMotion, vyomIcon } from './ui/dream.js';
 import { playCinema, renderCinema, cinemaKey, setCinemaReducedMotion } from './ui/cinema.js';
+import { faceFrontURI, pilotSpriteURI } from './ui/cinema-art.js';
+
+// The story's pilot: a portrait on the HUD, and the same face in the ship's cockpit
+const PILOT_PORTRAIT = faceFrontURI({ eyes: 'open', bg: 'space' });
+{ const img = new Image(); img.src = pilotSpriteURI(); setPilot(img); }
 import { PERK } from './data/perks.js';
 import { TRAIL } from './data/ships.js';
 import { ACHIEVEMENTS } from './data/achievements.js';
@@ -165,7 +170,8 @@ const app = {
       interlude: resume => cinema('open', () => { ui = 'dream'; showScreen('dream'); resume(); }),
       onDone: () => {
         Profile.update(p => { p.seen.intro = true; });
-        film ? cinema('wake', then) : then();
+        // wake in the pod → suit up, into the warship, launch → the game
+        film ? cinema('wake', () => cinema('launch', then)) : then();
       },
     });
     showScreen('dream');
@@ -256,7 +262,7 @@ async function startRun(id, { awaken = false } = {}) {
   });
   ui = 'play'; screen = null;
   showScreen(null);
-  $('hudCall').innerHTML = `${vyomIcon()}<span>INTERCEPTOR: <b>${esc(p.name)}</b></span>`;
+  $('hudCall').innerHTML = `<img class="hud-pilot" src="${PILOT_PORTRAIT}" alt="">${vyomIcon()}<span>INTERCEPTOR: <b>${esc(p.name)}</b></span>`;
   setPlayChrome(true);
   waveStart = waveSnapshot();
   if (awaken) assembleHud();

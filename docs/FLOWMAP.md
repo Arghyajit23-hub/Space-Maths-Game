@@ -31,15 +31,20 @@ Year 2047. A meteor swarm detected by the lunar far-side observatories falls on 
   2. **The cold open (a short film, about 35 s)** [`ui/cinema.js`]. Letterbox bars, captions in the bars, **SKIP →** after 3 s (`Esc`).
      - Title card: EARTH · 2047 / INTERCEPTOR CRYO VAULT · LUNAR GATEWAY.
      - Wide shot: a perspective dolly into a vault of pods (real 3D projection), a light beam with dust, a crimson beacon sweeping.
-     - Side dolly along **pod 07·114**, feet → head: the sleeper (cryo suit, thermal blanket, pillow, hand on the blanket) under frosted glass. The name plate reads *PILOT: <name>*, and the heart monitor shows 7 BPM.
+     - Side dolly along **pod 07·114**, feet → head: the sleeper (the pilot character: dark textured hair with faded sides, full beard, black rectangular glasses, brown techwear suit with a grey collar; thermal blanket, pillow, hand on the blanket) under frosted glass. The name plate reads *PILOT: <name>*, and the heart monitor shows 7 BPM.
      - Insert: the pod screen types WAKE SEQUENCE · authorised by: Vyom, with a soft alarm.
-     - Close-up of the face: heating coils glow, frost melts outward from the face, meltwater runs down, the heartbeat rises (12 → 46 BPM), and the first breath fogs the glass.
-     - Extreme close-up of the eye: frost melting on the lashes, the eye moving under the lid (REM). The camera pushes into the eye, into the dream.
+     - Close-up from above, through the pod window: the pilot's face (eyes closed, on the pillow). Heating coils glow around the window, frost melts outward from the face, meltwater runs down, the heartbeat rises (12 → 46 BPM), and each breath fogs the glass.
+     - Extreme close-up of the eye behind the glasses lens: frost melting on the lens and lashes, the eye moving under the lid (REM). The camera pushes into the eye, into the dream.
   3. **The Dreaming Conversation:** 14 lines between the player (silver, left or top) and **Vyom** (amber, right or bottom, a rotating icosahedron of light). Four phases (fragmentation → recognition → the stakes → the bridge) change the dreamspace: links form, maths symbols drift and then orbit Earth, memory shards float past, and the 21 cities light up. Each line forms letter by letter (1.5–3 s), holds 2 s, then advances; a tap or `Enter` skips ahead. **SKIP →** (`Esc`) appears after 3 s and jumps straight to the awakening.
   4. **The cognitive test:** a real Flight School equation (`add`/`sub`, level 1) on the game's own numpad (moved into the dream, translucent, FIRE shows ✓). A wrong answer gets a gentle retry line with no penalty.
   5. **The awakening:** the web ignites, light cracks it open, and the dream shatters outward (a snapshot of the last frame, drawn on the canvas). Then, in first person inside the pod (about 7 s): light glows red through the closed eyelids, the eyes flutter and blink twice, the blurred ceiling lights come into focus, the canopy hisses open in a burst of steam, and the captions read *STASIS ENDED · 7 YEARS, 142 DAYS* and *INTERCEPTOR <NAME> · REPORT TO LAUNCH*.
-  6. **Into the game:** a white flash, then the HUD lands piece by piece (score, hull, wave, callsign, Vyom's icon). New pilots go straight into Flight School with no briefing card.
-  - **How it's drawn:** everything is canvas and code; there are no image or audio files. The sleeper is one vector illustration (`cinema-art.js`) rasterised once per film, whole and as face and eye crops; frost, the hand, the monitor, breath, drips and lights are drawn live. Reduced motion skips the shatter, the letter scatter and the focus blur.
+  6. **Launch (about 8 s, SKIP → after 3 s)** [`playCinema('launch')`]:
+     - Suit up: the pilot's face, eyes open; the helmet closes and the visor HUD lights up (PILOT LINK, SYNC 100%, the callsign). Vyom: *"Hangar three. Your ship is fuelled. Go."*
+     - Hangar, from above: the warship on the launch pad between the tube rails; the pilot drops into the cockpit, the canopy slides shut and locks, the engines spool up.
+     - Launch: up the launch tube (rails streaking, camera shake), out into space with Earth's limb below, a white flash.
+  7. **Into the game:** the HUD lands piece by piece (score, hull, wave, the pilot's portrait, callsign, Vyom's icon). New pilots go straight into Flight School with no briefing card.
+  - **The pilot is in the warship:** every ship's cockpit shows the pilot's face under tinted glass (`render.js › setPilot`, drawn in `drawShipShape`), and the HUD callsign has the pilot's round portrait.
+  - **How it's drawn:** everything is canvas and code; there are no image or audio files. The pilot comes from one canonical portrait (`faceFrontSVG` in `cinema-art.js`: eyes open or closed; round space frame, pillow or no background), plus a side view for the pod (`podSVG`). Each is rasterised once per film, whole or as close-up crops; frost, the hand, the monitor, breath, drips, the helmet and lights are drawn live. Reduced motion skips the shatter, the letter scatter and the focus blur.
 - **Pilots on one device** [`services/profile.js`]: each name has its own save (`sm_pilot_<name>`, any letter case), listed in the roster `sm_pilots_v1`. The Void shows up to 6 saved pilots. Settings › **Switch pilot** goes back to the Void; renaming refuses a name another pilot uses; the Parent Zone reset erases only the current pilot. The old single save (`sm_profile_v2`) migrates into the roster automatically, and a new pilot inherits the device's sound and motion settings.
 - **Vyom stays:** the HUD shows `INTERCEPTOR: <name>` with Vyom's amber icon. At every supply drop he sends one line (`VYOM_LINES`, 18 lines, `pickVyomLine`). Priority: heavy hull damage (≥30% lost or hull ≤30%) > a line for that exact wave not heard yet (waves 1, 3, 5) > a perfect wave (no misses, no hull lost) > the wave stage (early ≤2, mid ≤7, late). The last 12 lines heard are kept in `profile.seen.vyomHeard`, so returning players hear new ones first.
 - Chapter opening before the first mission of each chapter; chapter ending after its planet-killer first falls (6-1 plays the finale). Replay from the Defense Map.
@@ -75,8 +80,9 @@ flowchart TD
     FI --> OP[Dreaming Conversation with Vyom]
     OP --> T[Cognitive test · one equation]
     T --> W[Awakening · shatter → first-person wake in the pod]
-    W -- Flight School not cleared --> D[Flight School · mission 1-0]
-    W -- cleared --> E
+    W --> LA[Launch · suit up → into the warship → out the tube]
+    LA -- Flight School not cleared --> D[Flight School · mission 1-0]
+    LA -- cleared --> E
     B -- returning --> W2["There you are." → awakening] --> E
     D --> E[[COMMAND DECK · hub]]
 
@@ -376,6 +382,6 @@ Game and render code must read `VIEW.W / VIEW.H` (never `CONFIG.WIDTH/HEIGHT`). 
 | 4 | Weekly leagues (30-pilot groups, promotion) | Accounts + scheduled jobs |
 | 4 | Sponsored tournaments, regional languages | Ops + i18n |
 
-Story ideas not built yet: voice lines for radio chatter and for Vyom, choosing how the sleeper looks (hair, skin) so the film matches the player, deleting a saved pilot from the Void, loss variants of chapter-ending scenes, munitions balance tuning with real players (bots always answer fast, so they always recover their rounds).
+Story ideas not built yet: voice lines for radio chatter and for Vyom, letting players choose their own pilot's look (the film, cockpit and HUD all use one portrait), deleting a saved pilot from the Void, loss variants of chapter-ending scenes, munitions balance tuning with real players (bots always answer fast, so they always recover their rounds).
 
 The client is already prepared for the backend phases: every answer is logged with skill id and time (`Session.log`), each pilot's profile is one JSON object (`Profile.export()`), runs are deterministic from a seed (needed for duels, replays and server verification), and the leaderboard carries `mode`, `day` and `fleet`.

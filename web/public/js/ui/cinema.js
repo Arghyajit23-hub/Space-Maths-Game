@@ -21,7 +21,8 @@ import { $ } from './dom.js';
 import { esc } from '../core/util.js';
 import { VIEW } from '../config.js';
 import { Sound } from '../services/audio.js';
-import { podSVG, CANOPY, HAND, FACE, EYE, MOUTH, PANEL } from './cinema-art.js';
+import { podSVG, faceFrontSVG, CANOPY, HAND, PANEL, FRONT_EYE, FRONT_MOUTH, FRONT_LENS } from './cinema-art.js';
+import { drawShipShape } from '../game/render.js';
 
 let C = null;
 let reduced = false;
@@ -51,12 +52,15 @@ function sprite(color) {
 // ════════════════════════════════════════════
 const CROPS = {
   full: { vb: [0, 0, 1600, 900], px: 2400 },
-  face: { vb: [220, 360, 260, 160], px: 1700 },
-  eye: { vb: [296, 398, 112, 69], px: 1700 },
+  top: { vb: [0, 0, 512, 512], px: 1500 },          // the face seen from above (front portrait)
+  eye: { vb: [128, 186, 140, 105], px: 1600 },      // left eye behind the lens
+  face: { vb: [0, 0, 512, 512], px: 1100 },
 };
+const POD_SIZE = 'viewBox="0 0 1600 900" width="1600" height="900"';
+const FACE_SIZE = 'viewBox="0 0 512 512" width="512" height="512"';
 async function raster(svg, crop) {
   const [x, y, w, h] = crop.vb, W = crop.px, H = Math.round(W * h / w);
-  const src = svg.replace('viewBox="0 0 1600 900" width="1600" height="900"', `viewBox="${x} ${y} ${w} ${h}" width="${W}" height="${H}"`);
+  const src = svg.replace(svg.includes(POD_SIZE) ? POD_SIZE : FACE_SIZE, `viewBox="${x} ${y} ${w} ${h}" width="${W}" height="${H}"`);
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
   await img.decode();
@@ -100,7 +104,7 @@ function makeFrost(x0, y0, w, h, scale, density = 1, size = 1) {
 }
 
 /** Draw frost, optionally with a melted hole (radius r, world units) around (mx, my). */
-function drawFrost(ctx, fr, alpha, mx, my, r) {
+function drawFrost(ctx, fr, alpha, mx, my, r, clip = CANOPY) {
   let src = fr.canvas;
   if (r > 0) {
     if (!fr.scratch) { fr.scratch = document.createElement('canvas'); fr.scratch.width = fr.canvas.width; fr.scratch.height = fr.canvas.height; }
@@ -114,7 +118,7 @@ function drawFrost(ctx, fr, alpha, mx, my, r) {
     src = s;
   }
   ctx.save(); ctx.globalAlpha = alpha;
-  ctx.clip(new Path2D(CANOPY));
+  if (clip) ctx.clip(new Path2D(clip));
   ctx.drawImage(src, fr.x, fr.y, fr.w, fr.h);
   ctx.restore();
 }
@@ -153,19 +157,26 @@ export function playCinema(kind, { name = '' } = {}, onDone) {
   $('cnSkip').onclick = e => { e.stopPropagation(); finish(); };
   setTimeout(() => C && $('cnSkip')?.classList.add('on'), 3000);
   for (let i = 0; i < 70; i++) C.dust.push({ x: rand(-3, 3), y: rand(-1.6, 1.2), z: rand(1, 9), s: rand(0.5, 1.6), ph: rand(0, 6.28) });
-  C.shots = kind === 'open' ? OPEN : WAKE;
+  C.shots = kind === 'open' ? OPEN : kind === 'launch' ? LAUNCH : WAKE;
   C.total = C.shots.reduce((s, x) => s + x.dur, 0);
+  const film = C;
   if (kind === 'open') {
     Sound.dreamPulse(0);
-    const svg = podSVG(name);
-    const film = C;
-    Promise.all([raster(svg, CROPS.full), raster(svg, CROPS.face), raster(svg, CROPS.eye)]).then(([full, face, eye]) => {
+    const svg = podSVG(name), asleep = faceFrontSVG({ eyes: 'closed', bg: 'pillow' });
+    Promise.all([raster(svg, CROPS.full), raster(asleep, CROPS.top), raster(asleep, CROPS.eye)]).then(([full, top, eye]) => {
       if (C !== film) return;
       const glass = [190, 326, 1230, 196];
-      C.assets = { full, face, eye,
+      C.assets = { full, top, eye,
         frostFull: makeFrost(...glass, 1.2, 1),
-        frostFace: makeFrost(220, 326, 260, 196, 6, 1.6, 0.28) };
+        frostTop: makeFrost(0, 0, 512, 512, 3, 1.5, 0.5),
+        frostLens: makeFrost(FRONT_LENS.x, FRONT_LENS.y, FRONT_LENS.w, FRONT_LENS.h, 14, 0.5, 0.12) };
       C.ready = true;
+    }).catch(() => { if (C === film) finish(); });
+  } else if (kind === 'launch') {
+    C.ready = false;
+    raster(faceFrontSVG({ eyes: 'open', bg: 'none' }), CROPS.face).then(face => {
+      if (C !== film) return;
+      C.assets = { face }; C.ready = true;
     }).catch(() => { if (C === film) finish(); });
   }
 }
@@ -283,49 +294,51 @@ const OPEN = [
   { dur: 3.8, fadeIn: 0.2, fadeOut: 0.3,
     enter() { caption(''); Sound.alarmSoft(); setTimeout(() => C && Sound.alarmSoft(), 900); C.bpm = 9; },
     draw(ctx, F, st, p, dt, t) { const beat = heart(t); screenInsert(ctx, F, st, p, beat); } },
-  // 4 · Close-up: the face; frost melts, first breath
+  // 4 · Close-up from above: the face through the pod window; frost melts, first breath
   { dur: 7.2, fadeIn: 0.3, fadeOut: 0.3,
     enter() { caption('CORE TEMPERATURE RISING · <b>6°C → 31°C</b>'); C.bpm = 12; Sound.hiss(5, 0.025); },
     draw(ctx, F, st, p, dt, t) {
       C.bpm = lerp(12, 46, seg(st, 0.5, 6.5));
       heart(t);
       const A = C.assets;
-      ctx.save(); camera(ctx, F, lerp(352, 346, p), lerp(438, 432, p), lerp(250, 228, ease(p)));
-      ctx.fillStyle = '#0c0a1e'; ctx.fillRect(200, 300, 300, 260);
-      ctx.drawImage(A.face.canvas, A.face.x, A.face.y, A.face.w, A.face.h);
-      coils(ctx, st);
+      ctx.save(); camera(ctx, F, 256, lerp(282, 262, ease(p)), lerp(600, 470, ease(p)));
+      ctx.drawImage(A.top.canvas, 0, 0, 512, 512);
+      podWindow(ctx, st);
       const melt = seg(st, 0.8, 6.2);
-      breath(ctx, st, dt, 4.3);
-      drawFrost(ctx, A.frostFace, lerp(0.95, 0.5, melt), FACE.x, FACE.y - 6, easeOut(melt) * 175);
-      drips(ctx, st, dt, melt);
+      breathTop(ctx, st, dt, 4.3);
+      drawFrost(ctx, A.frostTop, lerp(0.96, 0.4, melt), 256, 262, easeOut(melt) * 330, null);
+      drips(ctx, st, dt, melt, 256, 262, easeOut(melt) * 300, 520);
+      glassGlint(ctx, st, 0, 0, 512, 512);
       ctx.restore();
       if (st > 4.3) once('gasp', () => Sound.gasp());
     } },
-  // 5 · Extreme close-up: the eye dreams → push into the dream
+  // 5 · Extreme close-up: the eye behind the lens dreams → push into the dream
   { dur: 5, fadeIn: 0.25,
     enter() { caption('NEURAL ACTIVITY <b>DETECTED</b>'); C.bpm = 52; },
     draw(ctx, F, st, p, dt, t) {
       heart(t);
-      const A = C.assets, push = seg(st, 3.4, 5);
-      const visW = lerp(lerp(104, 88, seg(st, 0, 3.4)), 6, Math.pow(push, 2.2));
-      const jx = Math.sin(st * 37) * 0.08 * (1 - push), jy = Math.cos(st * 29) * 0.06;
-      ctx.save(); camera(ctx, F, EYE.x + jx + 1, EYE.y + jy + 1, visW);
-      ctx.fillStyle = '#0c0a1e'; ctx.fillRect(280, 380, 150, 110);
+      const A = C.assets, push = seg(st, 3.4, 5), E = FRONT_EYE;
+      const visW = lerp(lerp(150, 118, seg(st, 0, 3.4)), 8, Math.pow(push, 2.2));
+      const jx = Math.sin(st * 37) * 0.15 * (1 - push), jy = Math.cos(st * 29) * 0.1;
+      ctx.save(); camera(ctx, F, E.x + jx, E.y + 1 + jy, visW);
+      ctx.fillStyle = '#141026'; ctx.fillRect(100, 160, 200, 160);
       ctx.drawImage(A.eye.canvas, A.eye.x, A.eye.y, A.eye.w, A.eye.h);
-      // REM: the eye moving under the lid
-      const rx = EYE.x + 1 + Math.sin(st * 6.5) * 3.2 + Math.sin(st * 17) * 0.8;
-      const g = ctx.createRadialGradient(rx, EYE.y + 2, 0, rx, EYE.y + 2, 6.5);
-      g.addColorStop(0, 'rgba(255,214,186,0.38)'); g.addColorStop(1, 'rgba(255,214,186,0)');
-      ctx.fillStyle = g; ctx.fillRect(EYE.x - 14, EYE.y - 8, 30, 18);
-      // Frost on the lashes, melting into a drop
+      // REM: the eye moving under the closed lid
+      const rx = E.x + Math.sin(st * 6.5) * 8 + Math.sin(st * 17) * 1.6;
+      const g = ctx.createRadialGradient(rx, E.y - 1, 0, rx, E.y - 1, 12);
+      g.addColorStop(0, 'rgba(255,214,186,0.42)'); g.addColorStop(1, 'rgba(255,214,186,0)');
+      ctx.fillStyle = g; ctx.fillRect(E.x - 30, E.y - 16, 60, 30);
+      // Frost on the lashes, then a meltwater drop from the corner of the eye
       const m = seg(st, 0, 3);
-      ctx.fillStyle = `rgba(240,246,255,${(0.45 * (1 - m)).toFixed(3)})`;
-      for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.arc(EYE.x - 5 + k * 1.9 + (k % 2) * 0.4, EYE.y + 5.2 + (k % 3) * 0.7, 0.22 + (k % 2) * 0.12, 0, 6.283); ctx.fill(); }
+      ctx.fillStyle = `rgba(240,246,255,${(0.6 * (1 - m)).toFixed(3)})`;
+      for (let k = 0; k < 8; k++) { ctx.beginPath(); ctx.arc(E.x - 17 + k * 5, E.y + 8 + (k % 3), 0.5 + (k % 2) * 0.35, 0, 6.283); ctx.fill(); }
       if (m > 0.4) {
-        const dy = Math.min(9, (st - 1.3) * 3.4), a = clamp(1.4 - st / 3, 0, 1);
-        ctx.fillStyle = `rgba(220,235,255,${(0.55 * a).toFixed(3)})`;
-        ctx.beginPath(); ctx.ellipse(EYE.x + 7, EYE.y + 4 + dy, 0.55, 0.8, 0, 0, 6.283); ctx.fill();
+        const dy = Math.min(26, (st - 1.3) * 9), a = clamp(1.6 - st / 3, 0, 1);
+        ctx.fillStyle = `rgba(220,235,255,${(0.6 * a).toFixed(3)})`;
+        ctx.beginPath(); ctx.ellipse(E.x - 22, E.y + 4 + dy, 1.2, 1.8, 0, 0, 6.283); ctx.fill();
       }
+      // Frost on the lens melting from the centre
+      drawFrost(ctx, A.frostLens, 0.85 * (1 - seg(st, 2.4, 3.4)), E.x, E.y, easeOut(seg(st, 0, 3)) * 70, null);
       ctx.restore();
       if (push > 0) {
         once('dive', () => Sound.whoosh(1.4, 0.9));
@@ -525,54 +538,53 @@ function hand(ctx, twitch) {
   ctx.restore();
 }
 
-/** Heating coils along the canopy rim glow as the pod warms. */
-function coils(ctx, st) {
-  const a = seg(st, 0.2, 2.5) * (0.55 + 0.15 * Math.sin(st * 5));
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = `rgba(255,150,90,${(a * 0.7).toFixed(3)})`; ctx.lineWidth = 2.2;
-  for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(196, 514 - k * 5); ctx.lineTo(500, 514 - k * 5); ctx.stroke(); }
-  const g = ctx.createLinearGradient(0, 470, 0, 520); g.addColorStop(0, 'rgba(255,140,80,0)'); g.addColorStop(1, `rgba(255,140,80,${(a * 0.35).toFixed(3)})`);
-  ctx.fillStyle = g; ctx.fillRect(196, 470, 310, 52);
-  ctx.restore();
-}
-
-/** First breaths: vapour rising from the mouth and fogging the glass. */
-function breath(ctx, st, dt, from) {
-  if (st > from && C.puffs.length < 30 && Math.random() < dt * 9) C.puffs.push({ x: MOUTH.x + rand(-3, 3), y: MOUTH.y - 4, r: rand(3, 6), vy: rand(-14, -8), vx: rand(-3, 3), life: rand(1.6, 2.6), age: 0 });
+/** The pod window seen from above: a metal frame, and heating coils that glow as the pod warms. */
+function podWindow(ctx, st) {
   ctx.save();
-  for (const p of C.puffs) {
-    p.age += dt; p.y += p.vy * dt; p.x += p.vx * dt; p.r += dt * 9;
-    const a = Math.sin(clamp(p.age / p.life, 0, 1) * Math.PI) * 0.16;
-    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-    g.addColorStop(0, `rgba(235,240,255,${a.toFixed(3)})`); g.addColorStop(1, 'rgba(235,240,255,0)');
-    ctx.fillStyle = g; ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
-  }
-  C.puffs = C.puffs.filter(p => p.age < p.life);
-  // fog patch on the glass above the face
-  const fogA = seg(st, from + 0.4, from + 2.5) * (0.12 + 0.05 * Math.sin(st * 3));
-  if (fogA > 0) {
-    const g = ctx.createRadialGradient(MOUTH.x - 6, 340, 0, MOUTH.x - 6, 340, 50);
-    g.addColorStop(0, `rgba(235,240,255,${fogA.toFixed(3)})`); g.addColorStop(1, 'rgba(235,240,255,0)');
-    ctx.clip(new Path2D(CANOPY)); ctx.fillStyle = g; ctx.fillRect(MOUTH.x - 60, 300, 120, 90);
-  }
+  ctx.fillStyle = '#100c22';
+  ctx.beginPath(); ctx.rect(-400, -400, 1312, 1312);
+  ctx.roundRect(8, 8, 496, 496, 70); ctx.fill('evenodd');
+  ctx.strokeStyle = 'rgba(232,168,124,0.55)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(8, 8, 496, 496, 70); ctx.stroke();
+  const a = seg(st, 0.2, 2.5) * (0.55 + 0.15 * Math.sin(st * 5));
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = `rgba(255,150,90,${(a * 0.75).toFixed(3)})`; ctx.lineWidth = 2.5;
+  for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.roundRect(-4 - k * 7, -4 - k * 7, 520 + k * 14, 520 + k * 14, 78 + k * 6); ctx.stroke(); }
   ctx.restore();
 }
 
-/** Meltwater running down the glass. */
-function drips(ctx, st, dt, melt) {
-  if (melt > 0.15 && melt < 0.98 && C.drips.length < 26 && Math.random() < dt * 5) {
-    const a = rand(-2.6, -0.5), r = easeOut(melt) * 175;
-    C.drips.push({ x: FACE.x + Math.cos(a) * r * 0.9, y: FACE.y - 6 + Math.sin(a) * r * 0.5, v: rand(4, 10), len: 0 });
+/** A slow light glint across the glass. */
+function glassGlint(ctx, st, x, y, w, h) {
+  const u = ((st * 0.12) % 1.4) - 0.2;
+  const gx = x + w * u;
+  const g = ctx.createLinearGradient(gx - 60, y, gx + 60, y + h * 0.3);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.07)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(x, y, w, h); ctx.restore();
+}
+
+/** Seen from above: each breath fogs the glass over the mouth, then clears. */
+function breathTop(ctx, st, dt, from) {
+  if (st < from) return;
+  const period = 1.7, k = ((st - from) % period) / period;
+  const r = 30 + k * 70, a = Math.sin(k * Math.PI) * 0.28;
+  const g = ctx.createRadialGradient(FRONT_MOUTH.x, FRONT_MOUTH.y, 0, FRONT_MOUTH.x, FRONT_MOUTH.y, r);
+  g.addColorStop(0, `rgba(235,240,255,${a.toFixed(3)})`); g.addColorStop(0.7, `rgba(235,240,255,${(a * 0.4).toFixed(3)})`); g.addColorStop(1, 'rgba(235,240,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(FRONT_MOUTH.x - r, FRONT_MOUTH.y - r, r * 2, r * 2);
+}
+
+/** Meltwater running down the glass from the edge of the clearing. */
+function drips(ctx, st, dt, melt, cx, cy, R, maxY) {
+  if (melt > 0.15 && melt < 0.98 && C.drips.length < 30 && Math.random() < dt * 6) {
+    const a = rand(0, 6.283);
+    C.drips.push({ x: cx + Math.cos(a) * R * 0.85, y: cy + Math.sin(a) * R * 0.85, v: rand(6, 16), len: 0 });
   }
-  ctx.save(); ctx.clip(new Path2D(CANOPY));
   for (const d of C.drips) {
-    d.y += d.v * dt; d.len = Math.min(18, d.len + d.v * dt);
-    ctx.strokeStyle = 'rgba(220,232,255,0.25)'; ctx.lineWidth = 0.7;
+    d.y += d.v * dt; d.len = Math.min(26, d.len + d.v * dt);
+    ctx.strokeStyle = 'rgba(220,232,255,0.28)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(d.x, d.y - d.len); ctx.lineTo(d.x, d.y); ctx.stroke();
-    ctx.fillStyle = 'rgba(240,246,255,0.55)'; ctx.beginPath(); ctx.arc(d.x, d.y, 0.9, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(240,246,255,0.6)'; ctx.beginPath(); ctx.arc(d.x, d.y, 1.6, 0, 6.283); ctx.fill();
   }
-  C.drips = C.drips.filter(d => d.y < 520);
-  ctx.restore();
+  C.drips = C.drips.filter(d => d.y < maxY);
 }
 
 /** Insert: the pod's own screen fills the frame. */
@@ -729,4 +741,154 @@ function povScene(g, w, h, st, dt) {
     g.fillStyle = gr; g.fillRect(s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
   }
   C.steam = C.steam.filter(s => s.age < s.life);
+}
+
+// ════════════════════════════════════════════
+//  LAUNCH — from the pod to the warship (after the wake, before Flight School)
+//    1 Suit up     the pilot's face; the helmet visor drops, its HUD lights up
+//    2 Hangar      from above: the pilot drops into the cockpit, the canopy
+//                  slides shut, the engines spool
+//    3 Launch      up the launch tube and out into space → the game
+// ════════════════════════════════════════════
+const LAUNCH = [
+  { dur: 2.9, fadeOut: 0.2,
+    enter() { title(''); caption('VYOM · <b>“Hangar three. Your ship is fuelled. Go.”</b>'); C.bpm = 0; Sound.crackle(); },
+    draw(ctx, F, st, p) {
+      const A = C.assets;
+      ctx.save(); camera(ctx, F, 256, 250, lerp(560, 480, ease(p)));
+      const bg = ctx.createLinearGradient(0, -200, 0, 700); bg.addColorStop(0, '#0d0924'); bg.addColorStop(1, '#1a1036');
+      ctx.fillStyle = bg; ctx.fillRect(-900, -400, 2300, 1300);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 9; k++) { const x = -500 + k * 190, y = 60 + (k % 3) * 70, r = 60 + (k % 2) * 30; ctx.globalAlpha = 0.25; ctx.drawImage(sprite(k % 3 ? '#e8a87c' : '#8a6cd8'), x - r, y - r, r * 2, r * 2); }
+      ctx.restore();
+      ctx.drawImage(A.face.canvas, 0, 0, 512, 512);
+      helmet(ctx, st);
+      ctx.restore();
+      if (st > 0.55) once('servo', () => Sound.whoosh(0.6, 0.35));
+      if (st > 1.3) once('seal', () => Sound.clunk());
+      const w = 1 - seg(st, 0, 0.6);   // out of the wake's white flash
+      if (w > 0) { ctx.fillStyle = `rgba(255,248,240,${w})`; ctx.fillRect(F.fx, F.fy, F.fw, F.fh); }
+    } },
+  { dur: 3.1, fadeIn: 0.2, fadeOut: 0.15,
+    enter() { caption(`HANGAR 3 · INTERCEPTOR <b>${esc((C.name || '').toUpperCase())}</b>`); },
+    draw(ctx, F, st, p, dt) {
+      ctx.save(); camera(ctx, F, 0, lerp(30, 4, ease(p)), lerp(430, 330, ease(p)));
+      hangarFloor(ctx, st, 0);
+      const k = 2.7, spool = seg(st, 2.1, 3.1);
+      ctx.save(); ctx.scale(k, k);
+      if (spool > 0) { ctx.globalAlpha = spool; drawShipShape(ctx, 'interceptor', '#00e5ff', '#ffb48a', 1 + spool * 3, st, true, false); ctx.globalAlpha = 1; }
+      drawShipShape(ctx, 'interceptor', '#00e5ff', '#ffb48a', 1, st, false, false);
+      // the pilot settles into the seat
+      const sit = easeOut(seg(st, 0.1, 0.9)), img = C.assets.face.canvas;
+      ctx.save(); ctx.beginPath(); ctx.ellipse(0, -8, 7, 14, 0, 0, 6.283); ctx.clip();
+      ctx.globalAlpha = sit; const sc = lerp(1.35, 1, sit);
+      ctx.drawImage(img, 150 / 512 * img.width, 70 / 512 * img.height, 212 / 512 * img.width, 330 / 512 * img.height, -7 * sc, (-18 - 4) * sc + 4, 14 * sc, 21.8 * sc);
+      ctx.restore();
+      // canopy slides shut
+      const open = 1 - ease(seg(st, 0.9, 1.7));
+      ctx.save(); ctx.translate(0, -20 * open);
+      const cg = ctx.createLinearGradient(0, -22, 0, 6); cg.addColorStop(0, 'rgba(179,245,255,0.5)'); cg.addColorStop(1, 'rgba(26,93,122,0.3)');
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0, -8, 7.6, 14.6, 0, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = 'rgba(232,240,255,0.7)'; ctx.lineWidth = 0.6; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(-2.5, -15, 1.4, 4, -0.3, 0, 6.283); ctx.fill();
+      ctx.restore();
+      ctx.restore();
+      ctx.restore();
+      if (st > 0.95) once('hiss', () => Sound.hiss(0.7, 0.06));
+      if (st > 1.7) once('lock', () => Sound.clunk());
+      if (st > 2.1) once('spool', () => Sound.whoosh(1.2, 0.5));
+    } },
+  { dur: 2.2,
+    enter() { caption('LAUNCH'); C.streaks = Array.from({ length: 60 }, () => ({ x: Math.random(), y: Math.random(), v: rand(1.5, 3.5), l: rand(0.04, 0.12) })); Sound.whoosh(2, 1); Sound.clunk(); },
+    draw(ctx, F, st, p, dt) {
+      const { fx, fy, fw, fh } = F, cx = fx + fw / 2;
+      const space = seg(st, 0.8, 1.3), shake = (1 - space) * 6 * (reduced ? 0 : 1);
+      ctx.save(); ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+      // tube → space
+      ctx.fillStyle = '#100c22'; ctx.fillRect(fx, fy, fw, fh);
+      if (space > 0) { ctx.fillStyle = `rgba(5,4,18,${space})`; ctx.fillRect(fx, fy, fw, fh); }
+      const speed = lerp(3.2, 0.6, space);
+      for (const s of C.streaks) {
+        s.y += s.v * speed * dt; if (s.y > 1.1) { s.y = -0.1; s.x = Math.random(); }
+        const x = fx + s.x * fw, y = fy + s.y * fh, len = s.l * fh * lerp(1, 0.15, space);
+        ctx.strokeStyle = space < 0.5 ? `rgba(255,190,140,${(0.55 * (1 - space)).toFixed(3)})` : `rgba(230,236,255,${(0.7 * space).toFixed(3)})`;
+        ctx.lineWidth = lerp(2, 1.2, space); ctx.beginPath(); ctx.moveTo(x, y - len); ctx.lineTo(x, y); ctx.stroke();
+      }
+      // tube walls
+      if (space < 1) {
+        ctx.fillStyle = `rgba(30,24,60,${(1 - space).toFixed(3)})`;
+        ctx.fillRect(fx, fy, fw * 0.18, fh); ctx.fillRect(fx + fw * 0.82, fy, fw * 0.18, fh);
+        ctx.fillStyle = `rgba(232,168,124,${(0.7 * (1 - space)).toFixed(3)})`;
+        for (let k = 0; k < 8; k++) { const y = fy + ((k / 8 + st * 2.4) % 1) * fh; ctx.fillRect(fx + fw * 0.18 - 4, y, 4, fh * 0.05); ctx.fillRect(fx + fw * 0.82, y, 4, fh * 0.05); }
+      }
+      // Earth's limb rising below
+      if (space > 0) {
+        const r = fw * 1.2, ey = fy + fh + r - fh * 0.16 * space;
+        const g = ctx.createRadialGradient(cx, ey, r * 0.96, cx, ey, r * 1.08);
+        g.addColorStop(0, `rgba(30,95,140,${(0.9 * space).toFixed(3)})`); g.addColorStop(0.5, `rgba(120,170,230,${(0.5 * space).toFixed(3)})`); g.addColorStop(1, 'rgba(120,170,230,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, ey, r * 1.08, 0, 6.283); ctx.fill();
+      }
+      // the warship, climbing
+      const k = fh / 300, sy = fy + fh * lerp(0.75, 0.45, easeOut(seg(st, 0, 1.2)));
+      ctx.save(); ctx.translate(cx, sy); ctx.scale(k, k);
+      drawShipShape(ctx, 'interceptor', '#00e5ff', '#ffb48a', 4, st, true);
+      ctx.restore();
+      ctx.restore();
+      const flash = seg(st, 1.75, 2.2);
+      if (flash > 0) { ctx.fillStyle = `rgba(255,248,240,${flash})`; ctx.fillRect(fx, fy, fw, fh); }
+    } },
+];
+
+/** Hangar floor from above: grid, launch pad with hazard ring, rails running up the tube. */
+function hangarFloor(ctx, st) {
+  ctx.fillStyle = '#14112a'; ctx.fillRect(-900, -900, 1800, 1800);
+  ctx.strokeStyle = 'rgba(150,130,200,0.12)'; ctx.lineWidth = 1;
+  for (let x = -880; x <= 880; x += 40) { ctx.beginPath(); ctx.moveTo(x, -900); ctx.lineTo(x, 900); ctx.stroke(); }
+  for (let y = -880; y <= 880; y += 40) { ctx.beginPath(); ctx.moveTo(-900, y); ctx.lineTo(900, y); ctx.stroke(); }
+  // rails up the launch tube
+  for (const x of [-74, 74]) {
+    ctx.fillStyle = '#231d44'; ctx.fillRect(x - 6, -900, 12, 1020);
+    for (let y = -880; y < 110; y += 50) {
+      const a = 0.35 + 0.65 * Math.max(0, Math.sin(st * 6 - y * 0.02));
+      ctx.fillStyle = `rgba(232,168,124,${a.toFixed(3)})`; ctx.fillRect(x - 2, y, 4, 14);
+    }
+  }
+  // pad + hazard ring
+  ctx.lineWidth = 10;
+  for (let k = 0; k < 48; k++) {
+    ctx.strokeStyle = k % 2 ? 'rgba(212,149,107,0.75)' : 'rgba(42,28,44,0.9)';
+    ctx.beginPath(); ctx.arc(0, 0, 160, k / 48 * 6.283, (k + 1) / 48 * 6.283); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(232,168,124,0.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 148, 0, 6.283); ctx.stroke();
+  crimson(ctx, st, -500, -500, 1000, 1000);
+}
+
+/** The helmet closes around the pilot's head; its visor HUD lights up. */
+function helmet(ctx, st) {
+  const v = ease(seg(st, 0.5, 1.3)), on = seg(st, 1.4, 2.0);
+  if (v <= 0) return;
+  ctx.save(); ctx.translate(0, -560 * (1 - v));
+  // shell
+  ctx.lineWidth = 34; ctx.strokeStyle = '#2b2740';
+  ctx.beginPath(); ctx.ellipse(256, 262, 212, 238, 0, 0, 6.283); ctx.stroke();
+  ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(232,168,124,0.7)';
+  ctx.beginPath(); ctx.ellipse(256, 262, 196, 222, 0, 0, 6.283); ctx.stroke();
+  // visor glass
+  const g = ctx.createLinearGradient(80, 60, 430, 460);
+  g.addColorStop(0, 'rgba(155,109,255,0.16)'); g.addColorStop(0.5, 'rgba(232,168,124,0.08)'); g.addColorStop(1, 'rgba(139,34,82,0.14)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(256, 262, 195, 221, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.ellipse(170, 150, 40, 110, -0.5, 0, 6.283); ctx.fill();
+  // visor HUD
+  if (on > 0) {
+    ctx.globalAlpha = on;
+    ctx.strokeStyle = '#e8a87c'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(256, 262, 178, Math.PI * 1.05, Math.PI * 1.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(256, 262, 178, Math.PI * 1.7, Math.PI * 1.95); ctx.stroke();
+    ctx.fillStyle = '#ffd9b8'; ctx.font = '600 13px "Space Grotesk", sans-serif'; ctx.textAlign = 'left';
+    ctx.font = '600 12px "Space Grotesk", sans-serif';
+    ctx.fillText('PILOT LINK', 150, 336); ctx.fillText(`SYNC ${Math.round(on * 100)}%`, 150, 352);
+    ctx.textAlign = 'right'; ctx.fillText((C.name || '').toUpperCase().slice(0, 10), 362, 336); ctx.fillText('O₂ 100%', 362, 352);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
 }

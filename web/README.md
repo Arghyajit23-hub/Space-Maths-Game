@@ -12,7 +12,7 @@ A story-driven maths survival game for students aged 10–14 where **calculation
 
 | Area | What the player gets |
 |---|---|
-| **Opening: "The Dreaming Mind"** | Every visit starts in a dark neural web asking *WHO ARE YOU?* New pilots then get the full opening: a short film (a vault of cryo pods, their own sleeping body in pod 07·114 with their name on it, the frost melting, the eye dreaming), a conversation with **Vyom**, the program's architect, inside their rebuilding mind, one real equation to prove their mind is intact, and a first-person awakening as the pod opens into Flight School. Returning pilots go straight to their Command Deck. Replay it from Settings or Intel Files. |
+| **Opening: "The Dreaming Mind"** | Every visit starts in a dark neural web asking *WHO ARE YOU?* New pilots then get the full opening: a short film (a vault of cryo pods, their own sleeping body in pod 07·114 with their name on it, the frost melting, the eye dreaming), a conversation with **Vyom**, the program's architect, inside their rebuilding mind, one real equation to prove their mind is intact, a first-person awakening as the pod opens, and a quick launch: suit up, climb into the warship, blast out of the launch tube into Flight School. The pilot character (beard, glasses, techwear) then rides in the ship's cockpit and on the HUD. Returning pilots go straight to their Command Deck. Replay it from Settings or Intel Files. |
 | **Story: "The Swarm"** | 6 chapters with opening and ending scenes, a briefing card before every mission, in-run radio chatter and a finale. Cast: Vyom (who stays as a HUD icon and speaks at every supply drop), Commander Aisha Rao, Dr. Kenji Mori and rookie gunner "Spark". Scenes can be replayed from the Defense Map, Settings and Intel Files. |
 | **Munitions** | Each wave issues a fixed number of rounds. A correct answer uses one, a BLAZING answer recovers it, and a wrong answer wastes it. An empty magazine holds your answer until an emergency round arrives (one every 2.5 s). The debrief shows munitions efficiency. Off in Flight School and Assist mode. |
 | **Command Deck** | Hub with Continue (next mission, with the city it defends), Today's Wave, The Long Watch, Defense Map, Hangar, Brain Map, Intel Files, Records, Settings, Parent Zone and Earth Status. It also shows "Day N of the Swarm". Every tile has a keyboard shortcut. |
@@ -120,7 +120,7 @@ web/
         │                       progression (rewards, stars) · leaderboard · insights (Pilot DNA, parent report)
         │                       audio (procedural sound, incl. the dream drone and film effects)
         └── ui/                 dream.js (the Void, Vyom's conversation, the test, the shatter)
-                                cinema.js (the cold-open film + first-person wake) · cinema-art.js (the sleeper in the pod)
+                                cinema.js (the cold-open film, the first-person wake, the launch) · cinema-art.js (the pilot: front portrait + pod side view)
                                 hub.js (menu screens) · story.js (story player) · debrief.js · dom.js
 ```
 
@@ -131,7 +131,7 @@ web/
 - **The engine never knows what a challenge is.** A challenge source returns `{ prompt, answer, check(), skill, time, value, choice?, reveal?, parts? }`. To add a mode (for example spatial reasoning or word problems), write a source in `challenges/`, add it to `SOURCES`, and reference its skill ids from a mission in `data/galaxy.js`.
 - **All content is data.** Missions, perks, ships, crew, intel files, achievements and all story text (`data/story.js`: `DREAM`, `VYOM_LINES`, `CAST`, `CHAPTERS`, `BRIEFINGS`, `CITIES`, `RADIO`) are plain objects in `data/`, so adding a chapter, a briefing or a perk doesn't touch the engine. A story line is `{ who, text }`; `{name}` becomes the player's callsign.
 - **Story progress is just flags** in `profile.seen` (`intro`, `open_<system>`, `end_<system>`, plus `vyomHeard`, the last 12 supply-drop lines), so scenes play once and can be replayed.
-- **The opening is drawn in code.** The dreamspace and the film are canvas; the sleeper is one SVG (`cinema-art.js`) rasterised once per film. There are no image or audio files to load.
+- **The opening is drawn in code.** The dreamspace and the films are canvas; the pilot is one canonical portrait (`faceFrontSVG`) plus a pod side view (`podSVG`) in `cinema-art.js`, rasterised once per film. The same portrait is the HUD avatar and the face in the cockpit (`setPilot` in `render.js`). There are no image or audio files to load.
 - **Never hard-code the screen size.** Read `VIEW.W`, `VIEW.H`, `VIEW.shipY`, `VIEW.impactY`, `VIEW.fieldMinX/MaxX` and `VIEW.top` (FLOWMAP §12). CSS uses the `#game` classes `.v-narrow`, `.v-tall`, `.v-compact` and the `--safe-*` insets, not media queries.
 - **Runs are deterministic from a seed** (`core/rng.js`, per-event reseeding). That is how Today's Wave is fair, and it's the base for duels, replays and server-side verification.
 - **Each pilot is one JSON object** (`Profile.export()`), stored as `sm_pilot_<name>` and listed in the roster `sm_pilots_v1`, ready to sync to accounts later.

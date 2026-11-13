@@ -192,3 +192,7 @@ body.touch .screen.dream.testing .dr-skip { right: auto; bottom: auto; left: cal
 .v-tall .cn-cap { font-size: 15px; letter-spacing: 3px; line-height: 1.7; }
 .v-tall .cn-bar.bot { padding: 0 24px 40px; }
 .v-compact .cn-title .l1 { font-size: 30px; letter-spacing: 12px; padding-left: 12px; }
+
+/* The pilot's portrait next to the callsign */
+.hud-pilot { width: 26px; height: 26px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(232,168,124,.5), 0 0 10px rgba(63,209,255,.25); }
+#hud.assemble .hud-call .hud-pilot { animation: vyomLand 1s 1.2s cubic-bezier(.3,.7,.2,1) both; }

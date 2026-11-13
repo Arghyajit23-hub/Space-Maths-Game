@@ -443,6 +443,11 @@ function drawPlate(ctx, th, isTarget, p) {
 }
 
 // ── Player ship ─────────────────────────────────────────
+// The pilot (the story's character) sits in the cockpit, seen from above
+// looking up through the canopy. main.js sets the image once at boot.
+let pilotImg = null;
+export function setPilot(img) { pilotImg = img; }
+
 const HULLS = {
   interceptor: [[0, -40], [10, -14], [44, 10], [46, 22], [16, 16], [10, 22], [-10, 22], [-16, 16], [-46, 22], [-44, 10], [-10, -14]],
   scout: [[0, -46], [8, -10], [30, 14], [30, 22], [10, 18], [6, 22], [-6, 22], [-10, 18], [-30, 22], [-30, 14], [-8, -10]],
@@ -451,7 +456,7 @@ const HULLS = {
   phantom: [[0, -44], [6, -6], [50, 18], [18, 12], [0, 22], [-18, 12], [-50, 18], [-6, -6]],
 };
 
-export function drawShipShape(ctx, shape, color, trail, mult = 1, t = 0, flame = true) {
+export function drawShipShape(ctx, shape, color, trail, mult = 1, t = 0, flame = true, pilot = true) {
   if (flame) {
     ctx.globalCompositeOperation = 'lighter';
     const fl = 18 + Math.random() * 8 + mult * 3;
@@ -475,7 +480,20 @@ export function drawShipShape(ctx, shape, color, trail, mult = 1, t = 0, flame =
   ctx.globalAlpha = 1;
   const cg = ctx.createLinearGradient(0, -26, 0, 0);
   cg.addColorStop(0, '#b3f5ff'); cg.addColorStop(1, '#1a5d7a');
-  ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0, -10, 6, 14, 0, 0, 6.283); ctx.fill();
+  const pilotReady = pilot && pilotImg && pilotImg.complete && pilotImg.naturalWidth;
+  if (!pilotReady) { ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0, -10, 6, 14, 0, 0, 6.283); ctx.fill(); return; }
+  // Cockpit with the pilot inside, under tinted glass
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(0, -8, 7, 14, 0, 0, 6.283); ctx.clip();
+  ctx.fillStyle = '#0e1626'; ctx.fillRect(-7, -22, 14, 28);
+  ctx.drawImage(pilotImg, -7, -18, 14, 21.8);
+  const gg = ctx.createLinearGradient(0, -22, 0, 6);
+  gg.addColorStop(0, 'rgba(179,245,255,0.38)'); gg.addColorStop(1, 'rgba(26,93,122,0.3)');
+  ctx.fillStyle = gg; ctx.fillRect(-7, -22, 14, 28);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(200,240,255,0.7)'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.ellipse(0, -8, 7, 14, 0, 0, 6.283); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(-2.5, -15, 1.2, 3.6, -0.3, 0, 6.283); ctx.fill();
 }
 
 function drawShip(ctx, game, t) {
